@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#F4ECD8">
+    <title>Finanzas Personales</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+    
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inconsolata:wght@200..900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div id="app">
+        <!-- HEADER TOP -->
+        <header class="app-header">
+            <div class="user-info">
+                <img src="icon.png" alt="App Icon" class="avatar-img">
+                <div>
+                    <p class="greeting">Hola, Cristian</p>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-icon" id="theme-toggle" onclick="toggleTheme()" title="Cambiar Tema"><i class="fas fa-moon"></i></button>
+                <button class="btn-icon" id="export-csv" onclick="exportToCSV()" title="Descargar Lienzo (CSV)" style="margin-left: 15px;"><i class="fas fa-file-csv"></i></button>
+            </div>
+        </header>
+
+        <!-- MAIN VIEWS CONTAINER -->
+        <main class="views-container">
+            
+            <!-- ====== VIEW: HOME ====== -->
+            <section id="view-home" class="view active">
+                
+                <!-- Accounts Carousel -->
+                <div class="accounts-carousel" id="accounts-carousel">
+                    <!-- Javascript inyectará las Cuentas aquí -->
+                </div>
+
+                <!-- Global Actions -->
+                <section class="quick-actions">
+                    <button class="action-btn" onclick="openModal('expense')">
+                        <div class="action-icon"><i class="fas fa-arrow-up"></i></div>
+                        <span>Gasto</span>
+                    </button>
+                    <button class="action-btn" onclick="openModal('income')">
+                        <div class="action-icon"><i class="fas fa-arrow-down"></i></div>
+                        <span>Ingreso</span>
+                    </button>
+                    <button class="action-btn" onclick="openTransferModal()">
+                        <div class="action-icon"><i class="fas fa-exchange-alt"></i></div>
+                        <span>Transferir</span>
+                    </button>
+                    <button class="action-btn" onclick="alert('Módulo de recibos en la mesa de dibujo')">
+                        <div class="action-icon"><i class="fas fa-file-invoice-dollar"></i></div>
+                        <span>Recibos</span>
+                    </button>
+                </section>
+
+                <!-- Status / Recent -->
+                <section class="section-block">
+                    <div class="section-header">
+                        <h3>Historial de Movimientos</h3>
+                        <span class="see-all">Ver todo</span>
+                    </div>
+                    <div id="transactions-list" class="transactions-list">
+                        <!-- JS inyectado -->
+                    </div>
+                </section>
+                
+                <!-- Savings -->
+                <section class="section-block">
+                    <div class="section-header">
+                        <h3>Metas Económicas</h3>
+                    </div>
+                    <div id="savings-list" class="savings-list">
+                        <!-- JS inyectado -->
+                    </div>
+                </section>
+            </section>
+
+            <!-- ====== VIEW: ANALYTICS ====== -->
+            <section id="view-analytics" class="view hidden">
+                <div class="section-header">
+                    <h3>Estadísticas</h3>
+                    <select class="filter-select" id="analytics-time-filter" onchange="renderAnalytics()">
+                        <option value="all">Todo el Historial</option>
+                        <option value="day">Día (Hoy)</option>
+                        <option value="week">Semana</option>
+                        <option value="month">Este Mes</option>
+                        <option value="year">Este Año</option>
+                    </select>
+                </div>
+
+                <!-- Income / Outcome Cards -->
+                <div class="stats-cards mt-20">
+                    <div class="stat-card" id="card-income" onclick="toggleAnalyticsFilter('income')">
+                        <div class="s-icon" style="color: var(--action-income);"><i class="fas fa-arrow-trend-down"></i> Ingresos</div>
+                        <h2 class="stat-amount amount-income" id="stat-income" style="font-size: 1.5rem;">$0.00</h2>
+                    </div>
+                    <div class="stat-card" id="card-expense" onclick="toggleAnalyticsFilter('expense')">
+                        <div class="s-icon" style="color: var(--action-expense);"><i class="fas fa-arrow-trend-up"></i> Gastos</div>
+                        <h2 class="stat-amount amount-expense" id="stat-expense" style="font-size: 1.5rem;">$0.00</h2>
+                    </div>
+                    <div class="stat-card" id="card-transfer" onclick="toggleAnalyticsFilter('transfer')">
+                        <div class="s-icon" style="color: var(--text-secondary);"><i class="fas fa-exchange-alt"></i> Traslados</div>
+                        <h2 class="stat-amount amount-transfer" id="stat-transfer" style="font-size: 1.5rem; color: var(--text-secondary);">$0.00</h2>
+                    </div>
+                </div>
+                
+                <div id="analytics-sub-filter-box" class="hidden" style="margin-bottom: 20px;">
+                    <select class="filter-select" id="analytics-sub-filter" onchange="renderAnalytics()" style="width: 100%;">
+                        <!-- JS fill -->
+                    </select>
+                </div>
+
+                <!-- Spend Rate -->
+                <section class="section-block current-rate">
+                    <h3>Tasa de Gasto Actual</h3>
+                    <div class="empty-state">Módulo de canvas analítico en progreso...</div>
+                </section>
+            </section>
+            
+            <!-- ====== VIEW: SETTINGS / CATEGORIES ====== -->
+            <section id="view-settings" class="view hidden">
+                <div class="section-header">
+                    <h3>Configuración</h3>
+                </div>
+                
+                <div class="settings-card">
+                    <h4>Cuentas (Billeteras)</h4>
+                    <div id="settings-accounts"></div>
+                    <button class="btn btn-secondary mt-10" onclick="openAccountModal()">+ Añadir Cuenta</button>
+                </div>
+
+                <div class="settings-card mt-20">
+                    <h4>Metas Económicas</h4>
+                    <div id="settings-goals"></div>
+                    <button class="btn btn-secondary mt-10" onclick="openGoalModal()">+ Añadir Meta</button>
+                </div>
+
+                <div class="settings-card mt-20">
+                    <h4>Categorías</h4>
+                    <div id="settings-categories"></div>
+                    <button class="btn btn-secondary mt-10" onclick="openCategoryModal()">+ Añadir Categoría</button>
+                </div>
+            </section>
+
+        </main>
+
+        <!-- BOTTOM NAVIGATION -->
+        <nav class="bottom-nav">
+            <button class="nav-item active" data-target="view-home"><i class="fas fa-wallet"></i></button>
+            <button class="nav-item" data-target="view-analytics"><i class="fas fa-chart-pie"></i></button>
+            <button class="nav-item" data-target="view-settings"><i class="fas fa-palette"></i></button>
+        </nav>
+
+        <!-- Transaction Modal -->
+        <div id="transaction-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-title">Nuevo Trazo</h2>
+                    <button id="close-modal" class="btn-icon" type="button"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="transaction-form">
+                    <!-- Escondido para Edición -->
+                    <input type="hidden" id="tx-edit-id">
+
+                    <div class="input-group">
+                        <label for="date">Fecha</label>
+                        <input type="date" id="date" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="tx-account">Billetera Utilizada</label>
+                        <select id="tx-account" required></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="amount">Monto Original</label>
+                        <input type="number" id="amount" inputmode="decimal" step="any" placeholder="0.00" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="category">Categoría (Fija el tipo)</label>
+                        <select id="category" required></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="notes">Notas o Emociones (Opcional)</label>
+                        <textarea id="notes" placeholder="Pinturas al óleo..." rows="2"></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-save" id="tx-save-btn">Sellar en Lienzo</button>
+                    <button type="button" class="btn btn-secondary hidden mt-10" id="tx-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentTx()">Manchar (Borrar)</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Account Modal -->
+        <div id="account-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-title-acc">Nueva Billetera</h2>
+                    <button id="close-acc-modal" class="btn-icon" type="button" onclick="closeAccountModal()"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="account-form">
+                    <div class="input-group">
+                        <label for="acc-name">Nombre</label>
+                        <input type="text" id="acc-name" placeholder="Ej. Bóveda Suiza" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="acc-currency">Moneda (ISO)</label>
+                        <select id="acc-currency">
+                            <option value="USD">USD - Dólar Estadounidense</option>
+                            <option value="EUR">EUR - Euro</option>
+                            <option value="COP">COP - Peso Colombiano</option>
+                            <option value="RUB">RUB - Rublo Ruso</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="acc-balance">Balance Inicial</label>
+                        <input type="number" id="acc-balance" inputmode="decimal" step="any" placeholder="0.00" required>
+                    </div>
+                    <button type="submit" class="btn btn-save">Sellar Billetera</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Category Modal -->
+        <div id="category-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-title-cat">Nueva Categoría</h2>
+                    <button id="close-cat-modal" class="btn-icon" type="button" onclick="closeCategoryModal()"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="category-form">
+                    <input type="hidden" id="cat-edit-id">
+                    <div class="input-group">
+                        <label for="cat-name">Nombre</label>
+                        <input type="text" id="cat-name" placeholder="Ej. Acuarelas" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="cat-type">Tipo de Trazo</label>
+                        <select id="cat-type">
+                            <option value="expense">Gasto</option>
+                            <option value="income">Ingreso</option>
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label for="cat-budget">Límite / Presupuesto Mensual (0 = Sin límite)</label>
+                        <input type="number" id="cat-budget" placeholder="0" inputmode="decimal" step="any">
+                    </div>
+                    <div class="input-group" style="display: flex; align-items: center; gap: 15px;">
+                        <div style="flex:1">
+                            <label for="cat-color">Color</label>
+                            <input type="color" id="cat-color" value="#B23A1E" style="height: 50px; padding: 5px;">
+                        </div>
+                        <div style="flex:2">
+                            <label>Ícono</label>
+                            <input type="hidden" id="cat-icon" value="fa-tag">
+                            <div class="icon-selector" id="cat-icon-selector">
+                                <i class="fas fa-tag selected" data-icon="fa-tag"></i><i class="fas fa-shopping-basket" data-icon="fa-shopping-basket"></i><i class="fas fa-briefcase" data-icon="fa-briefcase"></i><i class="fas fa-utensils" data-icon="fa-utensils"></i><i class="fas fa-car" data-icon="fa-car"></i><i class="fas fa-bolt" data-icon="fa-bolt"></i><i class="fas fa-home" data-icon="fa-home"></i><i class="fas fa-plane" data-icon="fa-plane"></i><i class="fas fa-heartbeat" data-icon="fa-heartbeat"></i><i class="fas fa-gamepad" data-icon="fa-gamepad"></i><i class="fas fa-film" data-icon="fa-film"></i><i class="fas fa-book" data-icon="fa-book"></i><i class="fas fa-tshirt" data-icon="fa-tshirt"></i><i class="fas fa-paw" data-icon="fa-paw"></i><i class="fas fa-coffee" data-icon="fa-coffee"></i><i class="fas fa-laptop" data-icon="fa-laptop"></i><i class="fas fa-gift" data-icon="fa-gift"></i><i class="fas fa-music" data-icon="fa-music"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-save" id="cat-save-btn">Añadir a la Paleta</button>
+                    <button type="button" class="btn btn-secondary hidden mt-10" id="cat-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentCategory()">Borrar Categoría</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Transfer Modal -->
+        <div id="transfer-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="transfer-modal-h2">Transferencia Divina</h2>
+                    <button class="btn-icon" type="button" onclick="closeTransferModal()"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="transfer-form">
+                    <input type="hidden" id="trans-edit-id">
+                    <div class="input-group">
+                        <label for="trans-date">Fecha</label>
+                        <input type="date" id="trans-date" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="trans-from">De Bóveda</label>
+                        <select id="trans-from" required></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="trans-to">A Bóveda</label>
+                        <select id="trans-to" required></select>
+                    </div>
+                    <div class="input-group">
+                        <label for="trans-amount">Suma Extraída (Bóveda Origen)</label>
+                        <input type="number" id="trans-amount" inputmode="decimal" step="any" placeholder="0.00" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="trans-received">Suma Depositada (Bóveda Destino)</label>
+                        <input type="number" id="trans-received" inputmode="decimal" step="any" placeholder="Ingresa el monto tras el cambio" required>
+                    </div>
+                    <button type="submit" class="btn btn-save" id="trans-save-btn">Ejecutar Flujo</button>
+                    <button type="button" class="btn btn-secondary hidden mt-10" id="trans-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentTransfer()">Manchar (Borrar)</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Create Goal Modal -->
+        <div id="goal-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="goal-modal-title">Nuevo Horizonte</h2>
+                    <button class="btn-icon" type="button" onclick="closeGoalModal()"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="goal-form">
+                    <input type="hidden" id="goal-edit-id">
+                    <div class="input-group">
+                        <label for="goal-name">Inspiración (Meta)</label>
+                        <input type="text" id="goal-name" placeholder="Ej. Retrato en París" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="goal-target">Monto Objetivo Final</label>
+                        <input type="number" id="goal-target" inputmode="decimal" step="any" placeholder="1000.00" required>
+                    </div>
+                    <div class="input-group">
+                        <label for="goal-account">Vincular a Bóveda (Opcional)</label>
+                        <select id="goal-account">
+                            <!-- JS fill -->
+                        </select>
+                    </div>
+                    <div class="input-group">
+                        <label>Ícono representativo</label>
+                        <input type="hidden" id="goal-icon" value="fa-bullseye">
+                        <div class="icon-selector" id="goal-icon-selector">
+                            <i class="fas fa-bullseye selected" data-icon="fa-bullseye"></i><i class="fas fa-plane" data-icon="fa-plane"></i><i class="fas fa-car" data-icon="fa-car"></i><i class="fas fa-home" data-icon="fa-home"></i><i class="fas fa-laptop" data-icon="fa-laptop"></i><i class="fas fa-gamepad" data-icon="fa-gamepad"></i><i class="fas fa-graduation-cap" data-icon="fa-graduation-cap"></i><i class="fas fa-ring" data-icon="fa-ring"></i><i class="fas fa-baby" data-icon="fa-baby"></i><i class="fas fa-piggy-bank" data-icon="fa-piggy-bank"></i>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-save" id="goal-save-btn">Sellar Meta</button>
+                    <button type="button" class="btn btn-secondary hidden mt-10" id="goal-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentGoal()">Abandonar Visión (Borrar)</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Fund Goal Modal -->
+        <div id="fund-goal-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-fund-title">Aportar Fondos</h2>
+                    <button class="btn-icon" type="button" onclick="closeFundGoalModal()"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="fund-goal-form">
+                    <input type="hidden" id="fund-goal-id">
+                    <div class="input-group">
+                        <label for="fund-amount">Extraer del bolsillo general al pozo</label>
+                        <input type="number" id="fund-amount" inputmode="decimal" step="any" placeholder="0.00" required>
+                    </div>
+                    <button type="submit" class="btn btn-save">Surtir</button>
+                </form>
+            </div>
+        </div>
+
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>
