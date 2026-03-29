@@ -26,6 +26,8 @@
             </div>
             <div class="header-actions">
                 <button class="btn-icon" id="theme-toggle" onclick="toggleTheme()" title="Cambiar Tema"><i class="fas fa-moon"></i></button>
+                <input type="file" id="import-csv-file" accept=".csv" style="display: none;" onchange="importFromCSV(event)">
+                <button class="btn-icon" id="import-csv" onclick="document.getElementById('import-csv-file').click()" title="Importar Lienzo (CSV)" style="margin-left: 15px;"><i class="fas fa-file-import"></i></button>
                 <button class="btn-icon" id="export-csv" onclick="exportToCSV()" title="Descargar Lienzo (CSV)" style="margin-left: 15px;"><i class="fas fa-file-csv"></i></button>
             </div>
         </header>

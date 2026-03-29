@@ -746,5 +746,111 @@ window.exportToCSV = function() {
     document.body.removeChild(link);
 }
 
+window.importFromCSV = function(event) {
+    const file = event.target.files[0];
+    if(!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const text = e.target.result;
+        const rows = text.split('\n');
+        let importedCount = 0;
+        
+        // Reset balances cleanly to 0 to recalculate them from the transactions.
+        db.accounts.forEach(a => a.balance = 0);
+        // Clear all transactions since we are importing the whole canvas
+        db.transactions = [];
+
+        for(let i = 1; i < rows.length; i++) {
+            const row = rows[i].trim();
+            if(!row) continue;
+            
+            const cols = row.split(',');
+            if(cols.length < 9) continue;
+
+            const id = cols[0];
+            let dateStr = cols[1];
+            let dateVal = new Date().toISOString();
+            if(dateStr && dateStr.includes('/')) {
+                let parts = dateStr.split('/');
+                if(parts.length === 3 && parts[2].length === 4) {
+                    let dMatch = parseInt(parts[0]), mMatch = parseInt(parts[1]);
+                    if(dMatch > 12) { dateVal = `${parts[2]}-${mMatch.toString().padStart(2,'0')}-${dMatch.toString().padStart(2,'0')}T12:00:00.000Z`; }
+                    else { dateVal = `${parts[2]}-${mMatch.toString().padStart(2,'0')}-${dMatch.toString().padStart(2,'0')}T12:00:00.000Z`; }
+                }
+            } else if (dateStr) {
+                dateVal = new Date(dateStr).toISOString();
+            }
+
+            const type = cols[2];
+            const amountExtracted = parseFloat(cols[3]) || 0;
+            const amountReceived = parseFloat(cols[4]) || 0;
+            const fAccName = cols[5];
+            const tAccName = cols[6];
+            const catName = cols[7];
+            const notes = cols.slice(8).join(',');
+
+            // Helper to get or create account
+            const getOrCreateAccount = (name) => {
+                if(name === '-' || name === 'Borrada') return null;
+                let acc = db.accounts.find(a => a.name === name);
+                if(!acc) {
+                    acc = { id: Date.now() + Math.random(), name: name, currency: 'USD', balance: 0 };
+                    db.accounts.push(acc);
+                }
+                return acc;
+            };
+
+            if(type === 'Transferencia') {
+                const fAcc = getOrCreateAccount(fAccName);
+                const tAcc = getOrCreateAccount(tAccName);
+
+                db.transactions.push({
+                    id: id || crypto.randomUUID(), type: 'transfer', 
+                    from_account_id: fAcc ? fAcc.id : null, 
+                    to_account_id: tAcc ? tAcc.id : null,
+                    amount_extracted: amountExtracted, amount_received: amountReceived, date: dateVal, notes: notes
+                });
+                
+                if(fAcc) fAcc.balance -= amountExtracted;
+                if(tAcc) tAcc.balance += amountReceived;
+            } else {
+                let isIncome = type === 'Ingreso';
+                const acc = getOrCreateAccount(fAccName);
+                
+                let cat = db.categories.find(c => c.name === catName);
+                if(!cat && catName !== '-' && catName !== 'Borrada') {
+                    cat = { id: Date.now() + Math.random(), name: catName, type: isIncome ? 'income' : 'expense', budget: 0, visual_color: isIncome ? '#005F56' : '#B23A1E', icon: 'fa-tag' };
+                    db.categories.push(cat);
+                }
+
+                db.transactions.push({
+                    id: id || crypto.randomUUID(), type: 'standard', 
+                    account_id: acc ? acc.id : null, 
+                    category_id: cat ? cat.id : null, 
+                    amount: amountExtracted,
+                    date: dateVal, notes: notes
+                });
+                
+                if(acc) {
+                    if(isIncome) acc.balance += amountExtracted;
+                    else acc.balance -= amountExtracted;
+                }
+            }
+            importedCount++;
+        }
+        
+        db.transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
+        saveDB();
+        renderHome();
+        if(!document.getElementById('view-settings').classList.contains('hidden')) renderSettings();
+        if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
+        
+        alert(`Se han importado exitosamente ${importedCount} trazos al lienzo.`);
+    };
+    reader.readAsText(file);
+    event.target.value = ''; // Reset input
+}
+
 // Iniciar aplicación
 renderHome();
