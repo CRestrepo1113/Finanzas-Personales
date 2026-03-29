@@ -240,17 +240,10 @@ transferForm.addEventListener('submit', (e) => {
         if(oldFrom) oldFrom.balance += oldTx.amount_extracted;
         if(oldTo) oldTo.balance -= oldTx.amount_received;
 
-        if(fromAcc.balance < amountExtracted) {
-            if(oldFrom) oldFrom.balance -= oldTx.amount_extracted;
-            if(oldTo) oldTo.balance += oldTx.amount_received;
-            return alert("Fondos insuficientes al intentar modificar.");
-        }
-
         oldTx.from_account_id = fromId; oldTx.to_account_id = toId;
         oldTx.amount_extracted = amountExtracted; oldTx.amount_received = amountReceived;
         oldTx.date = dateVal;
     } else {
-        if(fromAcc.balance < amountExtracted) return alert("Fondos insuficientes en la bóveda de extracción.");
         db.transactions.push({
             id: crypto.randomUUID(), type: 'transfer', from_account_id: fromId, to_account_id: toId,
             amount_extracted: amountExtracted, amount_received: amountReceived, date: dateVal
@@ -285,9 +278,16 @@ window.openAccountModal = () => accModal.classList.remove('hidden');
 window.closeAccountModal = () => { accModal.classList.add('hidden'); accForm.reset(); };
 accForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    const typeMultiplier = document.getElementById('acc-type') ? parseFloat(document.getElementById('acc-type').value) : 1;
+    let finalBalance = parseFloat(document.getElementById('acc-balance').value);
+    
+    // Si la persona ya escribe un negativo, respetamos el signo. Si escribe positivo en 'Deuda', lo hacemos negativo.
+    if(typeMultiplier === -1 && finalBalance > 0) finalBalance = -finalBalance;
+    if(typeMultiplier === 1 && finalBalance < 0) finalBalance = Math.abs(finalBalance);
+
     db.accounts.push({
         id: Date.now(), name: document.getElementById('acc-name').value,
-        currency: document.getElementById('acc-currency').value, balance: parseFloat(document.getElementById('acc-balance').value)
+        currency: document.getElementById('acc-currency').value, balance: finalBalance
     });
     saveDB(); closeAccountModal(); renderHome(); renderSettings();
 });
@@ -445,14 +445,16 @@ function saveDB() {
 
 // -- RENDER HTML INTERFACE --
 function renderHome() {
-    accountsCarousel.innerHTML = db.accounts.map(acc => `
+    accountsCarousel.innerHTML = db.accounts.map(acc => {
+        const balanceColor = acc.balance < 0 ? 'color: var(--action-expense);' : '';
+        return `
         <div class="account-card">
             <i class="fas fa-asterisk ac-bg-lines"></i>
             <span class="ac-currency">${acc.currency}</span>
-            <h2 class="ac-balance">${acc.balance.toLocaleString('en-US', {style:'currency', currency: acc.currency})}</h2>
+            <h2 class="ac-balance" style="${balanceColor}">${acc.balance.toLocaleString('en-US', {style:'currency', currency: acc.currency})}</h2>
             <p class="ac-name">${acc.name}</p>
         </div>
-    `).join('');
+    `}).join('');
 
     const recents = db.transactions.slice(0, 10);
     if(recents.length === 0) { transactionsList.innerHTML = '<div class="empty-state">El lienzo está en blanco.</div>'; } 
@@ -652,12 +654,14 @@ window.renderAnalytics = function() {
 }
 
 function renderSettings() {
-    document.getElementById('settings-accounts').innerHTML = db.accounts.map(a => `
+    document.getElementById('settings-accounts').innerHTML = db.accounts.map(a => {
+        const balanceColor = a.balance < 0 ? 'color: var(--action-expense); font-weight: bold;' : '';
+        return `
         <div class="setting-row">
             <span><strong>${a.name}</strong> (${a.currency})</span>
-            <span>$${a.balance.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})} <i class="fas fa-trash trash-btn" onclick="deleteAccount(${a.id})"></i></span>
+            <span><span style="${balanceColor}">$${a.balance.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}</span> <i class="fas fa-trash trash-btn" onclick="deleteAccount(${a.id})"></i></span>
         </div>
-    `).join('');
+    `}).join('');
     
     document.getElementById('settings-categories').innerHTML = db.categories.map(c => `
         <div class="setting-row">
