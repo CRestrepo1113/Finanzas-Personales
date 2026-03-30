@@ -1,4 +1,4 @@
-﻿// 1. Initial State DB (V3 - Phase I Engineering)
+// 1. Initial State DB (V3 - Phase I Engineering)
 const initDB = {
     settings: {
         baseCurrency: 'USD',
@@ -292,24 +292,83 @@ window.deleteCurrentTransfer = function() {
 
 
 // Modals Settings: Cuentas y Categorías
-window.openAccountModal = () => accModal.classList.remove('hidden');
+window.openAccountModal = (id = null) => {
+    if (id) {
+        const a = db.accounts.find(acc => acc.id === id);
+        document.getElementById('acc-edit-id').value = a.id;
+        document.getElementById('acc-name').value = a.name;
+        document.getElementById('acc-currency').value = a.currency;
+        document.getElementById('acc-type').value = a.type || (a.balance < 0 ? 'liability' : 'asset');
+        document.getElementById('acc-balance').value = a.balance;
+        document.getElementById('acc-balance').readOnly = true;
+        document.getElementById('acc-balance-group').style.opacity = '0.6';
+        document.getElementById('acc-balance-hint').textContent = "(Auditoría Cerrada: Usa Transacciones para cuadres)";
+        document.getElementById('acc-color').value = a.color || '#DDA629';
+        
+        document.getElementById('modal-title-acc').textContent = "Editar Cuenta";
+        document.getElementById('acc-save-btn').textContent = "Guardar Cambios";
+        document.getElementById('acc-delete-btn').classList.remove('hidden');
+    } else {
+        document.getElementById('acc-edit-id').value = "";
+        document.getElementById('acc-balance').value = "";
+        document.getElementById('acc-balance').readOnly = false;
+        document.getElementById('acc-balance-group').style.opacity = '1';
+        document.getElementById('acc-balance-hint').textContent = "";
+        document.getElementById('acc-color').value = '#DDA629';
+        document.getElementById('modal-title-acc').textContent = "Nueva Cuenta";
+        document.getElementById('acc-save-btn').textContent = "Registrar Cuenta";
+        document.getElementById('acc-delete-btn').classList.add('hidden');
+    }
+    accModal.classList.remove('hidden');
+};
+
 window.closeAccountModal = () => { accModal.classList.add('hidden'); accForm.reset(); };
+
 accForm.addEventListener('submit', (e) => {
     e.preventDefault();
+    const editId = document.getElementById('acc-edit-id').value;
+    const name = document.getElementById('acc-name').value;
+    const currency = document.getElementById('acc-currency').value;
     const type = document.getElementById('acc-type').value;
-    let finalBalance = parseFloat(document.getElementById('acc-balance').value);
-    
-    // Respetar signo para liabilities, pero asegurarlo.
-    if(type === 'liability' && finalBalance > 0) finalBalance = -finalBalance;
-    if(type === 'asset' && finalBalance < 0) finalBalance = Math.abs(finalBalance);
+    const color = document.getElementById('acc-color').value;
 
-    db.accounts.push({
-        id: Date.now(), name: document.getElementById('acc-name').value,
-        currency: document.getElementById('acc-currency').value, balance: finalBalance,
-        type: type
-    });
+    if (editId) {
+        const a = db.accounts.find(x => x.id === parseInt(editId));
+        a.name = name; a.currency = currency; a.type = type; a.color = color;
+    } else {
+        let finalBalance = parseFloat(document.getElementById('acc-balance').value);
+        if(type === 'liability' && finalBalance > 0) finalBalance = -finalBalance;
+        if(type === 'asset' && finalBalance < 0) finalBalance = Math.abs(finalBalance);
+
+        db.accounts.push({
+            id: Date.now(), name: name, currency: currency, balance: finalBalance, type: type, color: color
+        });
+    }
     saveDB(); closeAccountModal(); renderHome(); renderSettings();
 });
+
+window.deleteCurrentAccount = function() {
+    const editId = document.getElementById('acc-edit-id').value;
+    if(!editId) return;
+    if(db.accounts.length <= 1) return alert("Acción denegada: No puedes destruir tu última cuenta estructurada.");
+    if(confirm("¿Eliminar cuenta permanentemente? Sus transacciones formarán agujeros contables.")) {
+        db.accounts = db.accounts.filter(a => a.id !== parseInt(editId)); 
+        saveDB(); closeAccountModal(); renderHome(); renderSettings(); 
+    }
+}
+
+window.moveAccountOrder = function(index, direction) {
+    if(direction === -1 && index > 0) {
+        const temp = db.accounts[index];
+        db.accounts[index] = db.accounts[index - 1];
+        db.accounts[index - 1] = temp;
+    } else if(direction === 1 && index < db.accounts.length - 1) {
+        const temp = db.accounts[index];
+        db.accounts[index] = db.accounts[index + 1];
+        db.accounts[index + 1] = temp;
+    }
+    saveDB(); renderHome(); renderSettings();
+}
 
 window.openCategoryModal = (catId = null) => {
     if (catId && typeof catId === 'number') {
@@ -463,10 +522,6 @@ fundGoalForm.addEventListener('submit', (e) => {
     saveDB(); closeFundGoalModal(); renderHome(); renderSettings();
 });
 
-window.deleteAccount = function(id) {
-    if(db.accounts.length <= 1) return alert("Acción denegada: No puedes destruir tu última cuenta estructurada.");
-    if(confirm("¿Eliminar cuenta permanentemente?")) { db.accounts = db.accounts.filter(a => a.id !== id); saveDB(); renderHome(); renderSettings(); }
-}
 window.deleteGoal = function(id) {
     if(confirm("¿Renunciar a este objetivo?")) { db.goals = db.goals.filter(g => g.id !== id); saveDB(); renderHome(); renderSettings(); }
 }
@@ -505,8 +560,9 @@ function renderHome() {
     renderNetWorth();
     accountsCarousel.innerHTML = db.accounts.map(acc => {
         const balanceColor = acc.balance < 0 ? 'color: var(--action-expense);' : '';
+        const cardColor = acc.color || 'var(--accent-gold)';
         return `
-        <div class="account-card">
+        <div class="account-card" style="background-color: ${cardColor}; border-color: ${cardColor};">
             <i class="fas fa-asterisk ac-bg-lines"></i>
             <span class="ac-currency">${acc.currency}</span>
             <h2 class="ac-balance" style="${balanceColor}">${acc.balance.toLocaleString('es-ES', {style:'currency', currency: acc.currency})}</h2>
@@ -772,12 +828,22 @@ window.saveExchangeRates = function() {
 
 function renderSettings() {
     renderExchangeRatesUI();
-    document.getElementById('settings-accounts').innerHTML = db.accounts.map(a => {
+    document.getElementById('settings-accounts').innerHTML = db.accounts.map((a, index) => {
         const balanceColor = a.balance < 0 ? 'color: var(--action-expense); font-weight: bold;' : '';
+        const cardColor = a.color || 'var(--accent-gold)';
         return `
         <div class="setting-row">
-            <span><strong>${a.name}</strong> (${a.currency})</span>
-            <span><span style="${balanceColor}">$${a.balance.toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2})}</span> <i class="fas fa-trash trash-btn" onclick="deleteAccount(${a.id})"></i></span>
+            <span onclick="openAccountModal(${a.id})" style="cursor: pointer; display: flex; align-items: center; gap: 10px; flex: 1;">
+                <span style="display:inline-block; width: 14px; height: 14px; border-radius: 50%; background-color: ${cardColor}; border: 1px solid var(--text-primary);"></span>
+                <span><strong>${a.name}</strong> (${a.currency})</span>
+            </span>
+            <span style="display: flex; align-items: center; gap: 10px;">
+                <span style="${balanceColor}">$${a.balance.toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2})}</span> 
+                <div style="display: flex; flex-direction: column; opacity: 0.6; cursor: pointer; padding: 0 5px;">
+                    <i class="fas fa-chevron-up" style="font-size: 0.8rem; padding: 2px;" onclick="moveAccountOrder(${index}, -1)"></i>
+                    <i class="fas fa-chevron-down" style="font-size: 0.8rem; padding: 2px;" onclick="moveAccountOrder(${index}, 1)"></i>
+                </div>
+            </span>
         </div>
     `}).join('');
     

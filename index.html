@@ -231,6 +231,7 @@
                     <button id="close-acc-modal" class="btn-icon" type="button" onclick="closeAccountModal()"><i class="fas fa-times"></i></button>
                 </div>
                 <form id="account-form">
+                    <input type="hidden" id="acc-edit-id">
                     <div class="input-group">
                         <label for="acc-name">Nombre</label>
                         <input type="text" id="acc-name" placeholder="Ej. Cuenta de Ahorros, Visa Crédito" required>
@@ -251,11 +252,16 @@
                             <option value="liability">Pasivo (Tarjetas de Crédito, Préstamos)</option>
                         </select>
                     </div>
-                    <div class="input-group">
-                        <label for="acc-balance">Balance Inicial</label>
+                    <div class="input-group" id="acc-balance-group">
+                        <label for="acc-balance">Balance Inicial <small id="acc-balance-hint"></small></label>
                         <input type="number" id="acc-balance" inputmode="decimal" step="any" placeholder="0.00" required>
                     </div>
-                    <button type="submit" class="btn btn-save">Registrar Cuenta</button>
+                    <div class="input-group">
+                        <label for="acc-color">Color de Tarjeta (Base Dorada)</label>
+                        <input type="color" id="acc-color" value="#DDA629" style="width: 100%; height: 40px; border: 2px solid var(--text-primary); border-radius: 4px; padding: 2px; cursor: pointer; background: var(--bg-primary);">
+                    </div>
+                    <button type="submit" class="btn btn-save" id="acc-save-btn">Registrar Cuenta</button>
+                    <button type="button" class="btn btn-secondary hidden mt-10" id="acc-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentAccount()">Eliminar Cuenta</button>
                 </form>
             </div>
         </div>
