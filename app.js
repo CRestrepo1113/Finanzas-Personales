@@ -1,4 +1,4 @@
-// 1. Initial State DB (V3 - Phase I Engineering)
+﻿// 1. Initial State DB (V3 - Phase I Engineering)
 const initDB = {
     settings: {
         baseCurrency: 'USD',
@@ -588,7 +588,7 @@ function renderHome() {
                     <div class="t-left">
                         <div class="t-icon" style="background-color: #2B2B2B"><i class="fas ${g.icon}"></i></div>
                         <div class="saving-info">
-                            <h4>${g.name} ${g.account_id ? '<i class="fas fa-link" style="font-size: 0.7rem; color: var(--text-secondary); margin-left: 5px;" title="Vinculado a Bóveda"></i>' : ''}</h4>
+                            <h4>${g.name} ${g.account_id ? '<i class="fas fa-link" style="font-size: 0.7rem; color: var(--text-secondary); margin-left: 5px;" title="Vinculado a Cuenta"></i>' : ''}</h4>
                             <p class="saving-amount">$${currentAmount.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / $${g.target.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                         </div>
                     </div>
@@ -599,7 +599,7 @@ function renderHome() {
                         <div class="saving-progress-bar" style="width: ${percent}%; background-color: var(--accent-gold);"></div>
                     </div>
                     <div class="saving-meta">
-                        <span>Lienzo llenado</span>
+                        <span>Patrimonio analizado</span>
                         <span>${percent}%</span>
                     </div>
                 </div>
@@ -677,7 +677,7 @@ window.renderAnalytics = function() {
         const sortedCats = Object.keys(catTotals).filter(k => expenseCatsTotal.includes(parseInt(k))).sort((a,b) => catTotals[b] - catTotals[a]);
         
         if(sortedCats.length === 0) {
-            rateContainer.innerHTML = '<h3>Distribución de Gastos</h3><div class="empty-state">Lienzo impoluto en este periodo.</div>';
+            rateContainer.innerHTML = '<h3>Distribución de Gastos</h3><div class="empty-state">No hay transacciones en este periodo.</div>';
             return;
         }
         let rateHTML = '<h3>Distribución de Gastos</h3><div class="rate-list">';
@@ -759,7 +759,7 @@ window.renderAnalytics = function() {
         });
 
         if(finalHistory.length === 0) {
-            rateContainer.innerHTML = `${headerContentHTML}<h3>${historyTitle}</h3><div class="empty-state">No hay trazos en este bloque de tiempo.</div>`;
+            rateContainer.innerHTML = `${headerContentHTML}<h3>${historyTitle}</h3><div class="empty-state">No hay transacciones registradas.</div>`;
         } else {
             const listHTML = finalHistory.map(tx => renderTransactionHTML(tx)).join('');
             rateContainer.innerHTML = `${headerContentHTML}<h3>${historyTitle}</h3><div class="transactions-list mt-10">${listHTML}</div>`;
@@ -911,23 +911,13 @@ document.querySelectorAll('.icon-selector i').forEach(icon => {
     });
 });
 
-// Tema y Exportación
-let currentTheme = localStorage.getItem('schiele_theme') || 'light';
-if(currentTheme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-document.addEventListener('DOMContentLoaded', () => {
-    const thI = document.querySelector('#theme-toggle i');
-    if(thI) thI.className = currentTheme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
-});
-
-window.toggleTheme = function() {
-    currentTheme = currentTheme === 'light' ? 'dark' : 'light';
-    document.documentElement.setAttribute('data-theme', currentTheme);
-    localStorage.setItem('schiele_theme', currentTheme);
-    document.querySelector('#theme-toggle i').className = currentTheme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
-}
+// Exportación
+// El modo oscuro fue removido a petición del usuario. Limpiar estado cacheado.
+document.documentElement.removeAttribute('data-theme');
+localStorage.setItem('schiele_theme', 'light');
 
 window.exportToCSV = function() {
-    let csvContent = "data:text/csv;charset=utf-8,ID,Fecha,Tipo_Trazo,Monto_Principal,Balance_Secundario,Boveda_Origen,Boveda_Destino,Categoria,Notas\n";
+    let csvContent = "data:text/csv;charset=utf-8,ID,Fecha,Tipo_Movimiento,Monto_Extraido,Monto_Recibido,Cuenta_Origen,Cuenta_Destino,Categoria,Notas\n";
     
     db.transactions.forEach(tx => {
         let date = new Date(tx.date).toLocaleDateString();
@@ -951,7 +941,7 @@ window.exportToCSV = function() {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Finanzas_Schiele_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `Finanzas_Export_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1057,7 +1047,7 @@ window.importFromCSV = function(event) {
         if(!document.getElementById('view-settings').classList.contains('hidden')) renderSettings();
         if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
         
-        alert(`Se han importado exitosamente ${importedCount} trazos al lienzo.`);
+        alert(`Se han importado exitosamente ${importedCount} transferencias/transacciones.`);
     };
     reader.readAsText(file);
     event.target.value = ''; // Reset input
