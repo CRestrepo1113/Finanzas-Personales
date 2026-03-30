@@ -828,7 +828,7 @@ window.saveExchangeRates = function() {
 
 function renderSettings() {
     renderExchangeRatesUI();
-    document.getElementById('settings-accounts').innerHTML = db.accounts.map((a, index) => {
+    const renderAccountRow = (a, index) => {
         const balanceColor = a.balance < 0 ? 'color: var(--action-expense); font-weight: bold;' : '';
         const cardColor = a.color || 'var(--accent-gold)';
         return `
@@ -845,20 +845,47 @@ function renderSettings() {
                 </div>
             </span>
         </div>
-    `}).join('');
+        `;
+    };
+
+    let assetsHTML = ''; let liabilitiesHTML = '';
+    db.accounts.forEach((acc, i) => {
+        if(acc.type === 'asset' || (acc.type !== 'liability' && acc.balance >= 0)) assetsHTML += renderAccountRow(acc, i);
+        else liabilitiesHTML += renderAccountRow(acc, i);
+    });
+
+    document.getElementById('settings-accounts').innerHTML = `
+        <h5 style="margin: 5px 0 5px; font-family: var(--font-heading); color: var(--action-income); font-size: 1rem;">Activos</h5>
+        ${assetsHTML || '<p style="color:var(--text-secondary);font-size:0.9rem; margin-bottom: 10px;">No registrados</p>'}
+        <h5 style="margin: 15px 0 5px; font-family: var(--font-heading); color: var(--action-expense); font-size: 1rem;">Pasivos</h5>
+        ${liabilitiesHTML || '<p style="color:var(--text-secondary);font-size:0.9rem;">No registrados</p>'}
+    `;
     
-    document.getElementById('settings-categories').innerHTML = db.categories.map(c => `
+    const renderCategoryRow = (c) => `
         <div class="setting-row">
             <span onclick="openCategoryModal(${c.id})" style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
                 <i class="fas ${c.icon}" style="color:${c.visual_color}; width:20px;"></i>
                 <span>
-                    <strong>${c.name}</strong> <small>(${c.type === 'income' ? 'Ingreso':'Gasto'})</small>
+                    <strong>${c.name}</strong>
                     ${c.budget > 0 ? `<br><small style="color:var(--text-secondary)">Límite: $${c.budget}</small>` : ''}
                 </span>
             </span>
             <i class="fas fa-trash trash-btn" onclick="openCategoryModal(${c.id})"></i>
         </div>
-    `).join('');
+    `;
+
+    let incomeCatHTML = ''; let expenseCatHTML = '';
+    db.categories.forEach(c => {
+        if(c.type === 'income') incomeCatHTML += renderCategoryRow(c);
+        else expenseCatHTML += renderCategoryRow(c);
+    });
+
+    document.getElementById('settings-categories').innerHTML = `
+        <h5 style="margin: 5px 0 5px; font-family: var(--font-heading); color: var(--action-income); font-size: 1rem;">Ingresos</h5>
+        ${incomeCatHTML || '<p style="color:var(--text-secondary);font-size:0.9rem; margin-bottom: 10px;">No registrados</p>'}
+        <h5 style="margin: 15px 0 5px; font-family: var(--font-heading); color: var(--action-expense); font-size: 1rem;">Gastos</h5>
+        ${expenseCatHTML || '<p style="color:var(--text-secondary);font-size:0.9rem;">No registrados</p>'}
+    `;
 
     const sg = document.getElementById('settings-goals');
     if(sg) {
