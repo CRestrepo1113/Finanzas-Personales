@@ -1,4 +1,4 @@
-﻿// 1. Initial State DB (V3 - Phase I Engineering)
+// 1. Initial State DB (V3 - Phase I Engineering)
 const initDB = {
     settings: {
         baseCurrency: 'USD',
@@ -917,31 +917,45 @@ document.documentElement.removeAttribute('data-theme');
 localStorage.setItem('schiele_theme', 'light');
 
 window.exportToCSV = function() {
-    let csvContent = "data:text/csv;charset=utf-8,ID,Fecha,Tipo_Movimiento,Monto_Extraido,Monto_Recibido,Cuenta_Origen,Cuenta_Destino,Categoria,Notas\n";
+    let csvContent = "";
     
-    db.transactions.forEach(tx => {
-        let date = new Date(tx.date).toLocaleDateString();
-        // Replace commas with spaces in notes
-        let notes = (tx.notes || '').replace(/,/g, ' ');
+    // settings
+    csvContent += "### AJUSTES_SISTEMA ###\nBaseCurrency,ExchangeRates\n";
+    csvContent += `${db.settings.baseCurrency},"${JSON.stringify(db.settings.exchangeRates).replace(/"/g, '""')}"\n\n`;
 
-        if(tx.type === 'transfer') {
-            const fAcc = db.accounts.find(a => a.id === tx.from_account_id)?.name || 'Borrada';
-            const tAcc = db.accounts.find(a => a.id === tx.to_account_id)?.name || 'Borrada';
-            csvContent += `${tx.id},${date},Transferencia,${tx.amount_extracted},${tx.amount_received},${fAcc},${tAcc},-,${notes}\n`;
-        } else {
-            const catObj = db.categories.find(c => c.id === tx.category_id);
-            const cat = catObj?.name || 'Borrada';
-            const subType = catObj?.type === 'income' ? 'Ingreso' : 'Gasto';
-            const acc = db.accounts.find(a => a.id === tx.account_id)?.name || 'Borrada';
-            
-            csvContent += `${tx.id},${date},${subType},${tx.amount},0,${acc},-,${cat},${notes}\n`;
-        }
+    // accounts
+    csvContent += "### BLOQUE_CUENTAS ###\nid,name,currency,balance,type,color\n";
+    db.accounts.forEach(a => {
+        csvContent += `${a.id},"${a.name}",${a.currency},${a.balance},${a.type},${a.color || ''}\n`;
+    });
+    csvContent += "\n";
+
+    // categories
+    csvContent += "### BLOQUE_CATEGORIAS ###\nid,name,type,budget,visual_color,icon\n";
+    db.categories.forEach(c => {
+        csvContent += `${c.id},"${c.name}",${c.type},${c.budget},${c.visual_color},${c.icon}\n`;
+    });
+    csvContent += "\n";
+
+    // goals
+    csvContent += "### BLOQUE_METAS ###\nid,name,target,current,icon,account_id\n";
+    db.goals.forEach(g => {
+        csvContent += `${g.id},"${g.name}",${g.target},${g.current},${g.icon},${g.account_id || ''}\n`;
+    });
+    csvContent += "\n";
+
+    // transactions (keep all exact inner fields to re-hydrate memory flawlessly)
+    csvContent += "### BLOQUE_TRANSACCIONES ###\nid,type,date,amount,amount_extracted,amount_received,from_account_id,to_account_id,category_id,account_id,notes\n";
+    db.transactions.forEach(tx => {
+        let notes = (tx.notes || '').replace(/"/g, '""');
+        csvContent += `${tx.id},${tx.type},${tx.date},${tx.amount || 0},${tx.amount_extracted || 0},${tx.amount_received || 0},${tx.from_account_id || ''},${tx.to_account_id || ''},${tx.category_id || ''},${tx.account_id || ''},"${notes}"\n`;
     });
 
-    const encodedUri = encodeURI(csvContent);
+    // Create a Blob and trigger download
+    const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Finanzas_Export_${new Date().toISOString().split('T')[0]}.csv`);
+    link.href = URL.createObjectURL(blob);
+    link.setAttribute("download", `Finanzas_BackupFullDB_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -951,106 +965,137 @@ window.importFromCSV = function(event) {
     const file = event.target.files[0];
     if(!file) return;
     
+    if(!confirm("⚠️ ADVERTENCIA CRÍTICA: Importar esta copia de seguridad sobrescribirá y reemplazará por completo todas tus cuentas, saldos, categorías, metas y transacciones actuales en este dispositivo, regresando al exacto punto de restauración del archivo. ¿Confirmas esta acción destructiva?")) {
+        event.target.value = '';
+        return;
+    }
+
     const reader = new FileReader();
     reader.onload = function(e) {
         const text = e.target.result;
-        const rows = text.split('\n');
-        let importedCount = 0;
         
-        // Reset balances cleanly to 0 to recalculate them from the transactions.
-        db.accounts.forEach(a => a.balance = 0);
-        // Clear all transactions since we are importing the whole canvas
-        db.transactions = [];
+        if(!text.includes('### BLOQUE_CUENTAS ###')) {
+            alert("Carga cancelada: El archivo no cumple con el formato estructurado del nuevo Sistema de Backup. Si es un historial transaccional antiguo, ya no es compatible para restauración de estado total.");
+            event.target.value = '';
+            return;
+        }
 
-        for(let i = 1; i < rows.length; i++) {
-            const row = rows[i].trim();
-            if(!row) continue;
+        const lines = text.split('\n').map(l => l.trim());
+        let mode = '';
+        let newDB = {
+            settings: { baseCurrency: 'USD', exchangeRates: {} },
+            accounts: [],
+            categories: [],
+            goals: [],
+            transactions: []
+        };
+        
+        const parseCSVLine = (str) => {
+            const arr = [];
+            let quote = false;  
+            let val = "";
+            for (let c of str) {
+                if(c === '"' && quote === false) { quote = true; }
+                else if(c === '"' && quote === true) { quote = false; }
+                else if(c === ',' && quote === false) { arr.push(val); val = ""; }
+                else { val += c; }
+            }
+            arr.push(val);
+            return arr.map(s => s.replace(/""/g, '"'));
+        };
+
+        for(let i = 0; i < lines.length; i++) {
+            let line = lines[i];
+            if(!line) continue;
             
-            const cols = row.split(',');
-            if(cols.length < 9) continue;
-
-            const id = cols[0];
-            let dateStr = cols[1];
-            let dateVal = new Date().toISOString();
-            if(dateStr && dateStr.includes('/')) {
-                let parts = dateStr.split('/');
-                if(parts.length === 3 && parts[2].length === 4) {
-                    let dMatch = parseInt(parts[0]), mMatch = parseInt(parts[1]);
-                    if(dMatch > 12) { dateVal = `${parts[2]}-${mMatch.toString().padStart(2,'0')}-${dMatch.toString().padStart(2,'0')}T12:00:00.000Z`; }
-                    else { dateVal = `${parts[2]}-${mMatch.toString().padStart(2,'0')}-${dMatch.toString().padStart(2,'0')}T12:00:00.000Z`; }
-                }
-            } else if (dateStr) {
-                dateVal = new Date(dateStr).toISOString();
+            if(line.startsWith('### ')) {
+                mode = line;
+                i++; // skip header line right below the tag
+                continue;
             }
 
-            const type = cols[2];
-            const amountExtracted = parseFloat(cols[3]) || 0;
-            const amountReceived = parseFloat(cols[4]) || 0;
-            const fAccName = cols[5];
-            const tAccName = cols[6];
-            const catName = cols[7];
-            const notes = cols.slice(8).join(',');
+            const cols = parseCSVLine(line);
 
-            // Helper to get or create account
-            const getOrCreateAccount = (name) => {
-                if(name === '-' || name === 'Borrada') return null;
-                let acc = db.accounts.find(a => a.name === name);
-                if(!acc) {
-                    acc = { id: Date.now() + Math.random(), name: name, currency: 'USD', balance: 0 };
-                    db.accounts.push(acc);
-                }
-                return acc;
-            };
-
-            if(type === 'Transferencia') {
-                const fAcc = getOrCreateAccount(fAccName);
-                const tAcc = getOrCreateAccount(tAccName);
-
-                db.transactions.push({
-                    id: id || crypto.randomUUID(), type: 'transfer', 
-                    from_account_id: fAcc ? fAcc.id : null, 
-                    to_account_id: tAcc ? tAcc.id : null,
-                    amount_extracted: amountExtracted, amount_received: amountReceived, date: dateVal, notes: notes
-                });
-                
-                if(fAcc) fAcc.balance -= amountExtracted;
-                if(tAcc) tAcc.balance += amountReceived;
-            } else {
-                let isIncome = type === 'Ingreso';
-                const acc = getOrCreateAccount(fAccName);
-                
-                let cat = db.categories.find(c => c.name === catName);
-                if(!cat && catName !== '-' && catName !== 'Borrada') {
-                    cat = { id: Date.now() + Math.random(), name: catName, type: isIncome ? 'income' : 'expense', budget: 0, visual_color: isIncome ? '#005F56' : '#B23A1E', icon: 'fa-tag' };
-                    db.categories.push(cat);
-                }
-
-                db.transactions.push({
-                    id: id || crypto.randomUUID(), type: 'standard', 
-                    account_id: acc ? acc.id : null, 
-                    category_id: cat ? cat.id : null, 
-                    amount: amountExtracted,
-                    date: dateVal, notes: notes
-                });
-                
-                if(acc) {
-                    if(isIncome) acc.balance += amountExtracted;
-                    else acc.balance -= amountExtracted;
+            if(mode === '### AJUSTES_SISTEMA ###') {
+                if(cols.length >= 2) {
+                    newDB.settings.baseCurrency = cols[0];
+                    try { newDB.settings.exchangeRates = JSON.parse(cols[1]); } catch(err){}
                 }
             }
-            importedCount++;
+            else if(mode === '### BLOQUE_CUENTAS ###') {
+                if(cols.length >= 6) {
+                    newDB.accounts.push({
+                        id: Number(cols[0]),
+                        name: cols[1],
+                        currency: cols[2],
+                        balance: parseFloat(cols[3]) || 0,
+                        type: cols[4],
+                        color: cols[5]
+                    });
+                }
+            }
+            else if(mode === '### BLOQUE_CATEGORIAS ###') {
+                if(cols.length >= 6) {
+                    newDB.categories.push({
+                        id: Number(cols[0]),
+                        name: cols[1],
+                        type: cols[2],
+                        budget: parseFloat(cols[3]) || 0,
+                        visual_color: cols[4],
+                        icon: cols[5]
+                    });
+                }
+            }
+            else if(mode === '### BLOQUE_METAS ###') {
+                if(cols.length >= 6) {
+                    newDB.goals.push({
+                        id: Number(cols[0]),
+                        name: cols[1],
+                        target: parseFloat(cols[2]) || 0,
+                        current: parseFloat(cols[3]) || 0,
+                        icon: cols[4],
+                        account_id: cols[5] ? Number(cols[5]) : null
+                    });
+                }
+            }
+            else if(mode === '### BLOQUE_TRANSACCIONES ###') {
+                if(cols.length >= 11) { 
+                    newDB.transactions.push({
+                        id: cols[0],
+                        type: cols[1],
+                        date: cols[2],
+                        amount: parseFloat(cols[3]) || 0,
+                        amount_extracted: parseFloat(cols[4]) || 0,
+                        amount_received: parseFloat(cols[5]) || 0,
+                        from_account_id: cols[6] ? Number(cols[6]) : null,
+                        to_account_id: cols[7] ? Number(cols[7]) : null,
+                        category_id: cols[8] ? Number(cols[8]) : null,
+                        account_id: cols[9] ? Number(cols[9]) : null,
+                        notes: cols[10]
+                    });
+                }
+            }
         }
         
-        db.transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
-        saveDB();
-        renderHome();
-        if(!document.getElementById('view-settings').classList.contains('hidden')) renderSettings();
-        if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
-        
-        alert(`Se han importado exitosamente ${importedCount} transferencias/transacciones.`);
+        if(newDB.accounts.length > 0) {
+            db.accounts = newDB.accounts;
+            db.categories = newDB.categories;
+            db.goals = newDB.goals;
+            db.transactions = newDB.transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
+            if(newDB.settings && newDB.settings.baseCurrency) db.settings = newDB.settings;
+            
+            saveDB();
+            renderHome();
+            if(!document.getElementById('view-settings').classList.contains('hidden')) renderSettings();
+            if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
+            
+            alert(`Amnesia selectiva controlada completada. La estructura financiera ha regresado fidedignamente al punto de restauración emitido en el CSV.`);
+        } else {
+            alert(`Error: Formato CSV incompatible o corrupto. Imposible efectuar la restauración.`);
+        }
     };
     reader.readAsText(file);
-    event.target.value = ''; // Reset input
+    event.target.value = '';
 }
 
 // Iniciar aplicación
