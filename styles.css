@@ -133,8 +133,9 @@ body {
 .tab-btn { padding: 8px 18px; background: transparent; border: 2px solid var(--text-primary); font-family: var(--font-heading); font-weight: 700; border-radius: 12px 2px 10px 4px; cursor: pointer; white-space: nowrap; font-size:1.1rem; color: var(--text-primary); transition: all 0.2s;}
 .tab-btn.active { background: var(--text-primary); color: var(--bg-primary); }
 
-.stats-cards { display: flex; gap: 15px; margin-bottom: 35px; }
-.stat-card { flex: 1; background: var(--bg-card); border: 2px solid var(--text-primary); border-radius: 4px 15px 3px 8px; padding: 20px; box-shadow: 4px 4px 0px var(--text-primary); cursor: pointer; transition: all 0.2s;}
+.stats-cards { display: flex; gap: 15px; margin-bottom: 35px; overflow-x: auto; padding-bottom: 15px; padding-right: 15px; scroll-snap-type: x mandatory; }
+.stats-cards::-webkit-scrollbar { display: none; }
+.stat-card { flex: 1 0 auto; min-width: 125px; scroll-snap-align: center; background: var(--bg-card); border: 2px solid var(--text-primary); border-radius: 4px 15px 3px 8px; padding: 20px; box-shadow: 4px 4px 0px var(--text-primary); cursor: pointer; transition: all 0.2s;}
 .stat-card:active { transform: translateY(2px); box-shadow: 2px 2px 0px var(--text-primary); }
 .stat-card.active-filter { background: var(--bg-primary); box-shadow: 2px 2px 0px var(--text-primary); transform: translateY(2px); }
 .s-icon { font-size: 0.85rem; font-weight: 700; margin-bottom: 5px; text-transform: uppercase; letter-spacing: 1px;}

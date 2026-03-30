@@ -1,4 +1,4 @@
-// 1. Initial State DB (V3 - Phase I Engineering)
+﻿// 1. Initial State DB (V3 - Phase I Engineering)
 const initDB = {
     settings: {
         baseCurrency: 'USD',
@@ -496,9 +496,9 @@ function renderNetWorth() {
     
     const net = tAssets - tLiabilities;
     
-    document.getElementById('total-net-worth').textContent = `${baseCur} ${net.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
-    document.getElementById('total-assets').textContent = `${baseCur} ${tAssets.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
-    document.getElementById('total-liabilities').textContent = `${baseCur} ${tLiabilities.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+    document.getElementById('total-net-worth').textContent = `${baseCur} ${net.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+    document.getElementById('total-assets').textContent = `${baseCur} ${tAssets.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+    document.getElementById('total-liabilities').textContent = `${baseCur} ${tLiabilities.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
 }
 
 function renderHome() {
@@ -509,7 +509,7 @@ function renderHome() {
         <div class="account-card">
             <i class="fas fa-asterisk ac-bg-lines"></i>
             <span class="ac-currency">${acc.currency}</span>
-            <h2 class="ac-balance" style="${balanceColor}">${acc.balance.toLocaleString('en-US', {style:'currency', currency: acc.currency})}</h2>
+            <h2 class="ac-balance" style="${balanceColor}">${acc.balance.toLocaleString('es-ES', {style:'currency', currency: acc.currency})}</h2>
             <p class="ac-name">${acc.name}</p>
         </div>
     `}).join('');
@@ -533,7 +533,7 @@ function renderHome() {
                         <div class="t-icon" style="background-color: #2B2B2B"><i class="fas ${g.icon}"></i></div>
                         <div class="saving-info">
                             <h4>${g.name} ${g.account_id ? '<i class="fas fa-link" style="font-size: 0.7rem; color: var(--text-secondary); margin-left: 5px;" title="Vinculado a Bóveda"></i>' : ''}</h4>
-                            <p class="saving-amount">$${currentAmount.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} / $${g.target.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                            <p class="saving-amount">$${currentAmount.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} / $${g.target.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
                         </div>
                     </div>
                     <button class="saving-progress-btn" onclick="event.stopPropagation(); ${actionOnClick}"><i class="fas ${actionIcon}"></i></button>
@@ -583,9 +583,9 @@ window.renderAnalytics = function() {
         }
     });
     
-    document.getElementById('stat-income').textContent = `$${totalIncome.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}`;
-    document.getElementById('stat-expense').textContent = `$${totalExpense.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}`;
-    document.getElementById('stat-transfer').textContent = `$${totalTransferred.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}`;
+    document.getElementById('stat-income').textContent = `$${totalIncome.toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2})}`;
+    document.getElementById('stat-expense').textContent = `$${totalExpense.toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2})}`;
+    document.getElementById('stat-transfer').textContent = `$${totalTransferred.toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2})}`;
 
     // Manage UI active styles for stat cards
     document.querySelectorAll('.stat-card').forEach(c => c.classList.remove('active-filter'));
@@ -777,7 +777,7 @@ function renderSettings() {
         return `
         <div class="setting-row">
             <span><strong>${a.name}</strong> (${a.currency})</span>
-            <span><span style="${balanceColor}">$${a.balance.toLocaleString(undefined,{minimumFractionDigits:2, maximumFractionDigits:2})}</span> <i class="fas fa-trash trash-btn" onclick="deleteAccount(${a.id})"></i></span>
+            <span><span style="${balanceColor}">$${a.balance.toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2})}</span> <i class="fas fa-trash trash-btn" onclick="deleteAccount(${a.id})"></i></span>
         </div>
     `}).join('');
     
