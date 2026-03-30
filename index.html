@@ -172,12 +172,67 @@
                 </div>
             </section>
 
+            <!-- ====== VIEW: ZBB ====== -->
+            <section id="view-zbb" class="view hidden">
+                <div class="section-header">
+                    <h3>Presupuesto ZBB</h3>
+                    <div class="header-actions">
+                        <button class="btn-icon" onclick="exportZBBPlan()" title="Exportar Plan a Python">
+                            <i class="fas fa-file-code"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Income Card -->
+                <section class="net-worth-panel" style="padding-bottom:15px; margin-bottom: 20px;">
+                    <div class="nw-header" style="border-bottom:none; margin-bottom: 5px; padding-bottom: 0;">
+                        <h2 style="font-size: 1.1rem; color: var(--text-secondary);">Ingreso Total del Ciclo</h2>
+                        <input type="number" id="zbb-income-input" class="zbb-huge-input" placeholder="0.00" oninput="updateZBB()" inputmode="decimal" step="any">
+                    </div>
+                </section>
+                
+                <!-- Heuristic Guide Container -->
+                <div id="zbb-guide-module" class="hidden">
+                    <h4 style="font-family: var(--font-heading); margin-bottom: 10px; font-size: 1.2rem;">Guía Heurística 50/30/20</h4>
+                    <div class="stats-cards" style="margin-bottom: 20px;">
+                        <div class="stat-card" style="padding: 15px;">
+                            <div class="s-icon" style="color: var(--text-primary);"><i class="fas fa-home"></i> 50% Necesidades</div>
+                            <h2 class="stat-amount" id="zbb-guide-needs" style="font-size: 1.3rem;">$0.00</h2>
+                        </div>
+                        <div class="stat-card" style="padding: 15px;">
+                            <div class="s-icon" style="color: var(--text-secondary);"><i class="fas fa-shopping-basket"></i> 30% Deseos</div>
+                            <h2 class="stat-amount" id="zbb-guide-wants" style="font-size: 1.3rem;">$0.00</h2>
+                        </div>
+                        <div class="stat-card" style="padding: 15px;">
+                            <div class="s-icon" style="color: var(--accent-gold);"><i class="fas fa-shield-alt"></i> 20% Futuro</div>
+                            <h2 class="stat-amount" id="zbb-guide-savings" style="font-size: 1.3rem;">$0.00</h2>
+                        </div>
+                    </div>
+
+                    <!-- Category Allocations -->
+                    <h4 style="font-family: var(--font-heading); margin-bottom: 15px; font-size: 1.4rem;">Asignación de Capital</h4>
+                    <div id="zbb-categories-list" style="margin-bottom: 150px;">
+                        <!-- Injected by JS -->
+                    </div>
+                </div>
+
+                <!-- Floating Delta Widget -->
+                <div id="zbb-floating-delta" class="zbb-floating-widget hidden">
+                    <div class="zbb-delta-info">
+                        <span class="zbb-delta-label">Remanente ($\Delta$)</span>
+                        <span class="zbb-delta-value" id="zbb-delta-val">$0.00</span>
+                    </div>
+                    <button class="btn zbb-save-btn" id="zbb-save-plan" onclick="saveZBBPlan()">Guardar</button>
+                </div>
+            </section>
+
         </main>
 
         <!-- BOTTOM NAVIGATION -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-target="view-home"><i class="fas fa-wallet"></i></button>
             <button class="nav-item" data-target="view-analytics"><i class="fas fa-chart-pie"></i></button>
+            <button class="nav-item" data-target="view-zbb"><i class="fas fa-balance-scale"></i></button>
             <button class="nav-item" data-target="view-settings"><i class="fas fa-cog"></i></button>
         </nav>
 

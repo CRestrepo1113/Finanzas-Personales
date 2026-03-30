@@ -1098,5 +1098,167 @@ window.importFromCSV = function(event) {
     event.target.value = '';
 }
 
+// --- MODULO ZBB (Zero-Based Budgeting 50/30/20) ---
+let currentZBBPlan = {};
+
+function initZBBView() {
+    const categoriesList = document.getElementById('zbb-categories-list');
+    const allCategories = db.categories;
+    
+    if(allCategories.length === 0) {
+        categoriesList.innerHTML = '<div class="empty-state">No hay categorías para presupuestar. Crea algunas en Configuración.</div>';
+        return;
+    }
+
+    let html = '';
+    allCategories.forEach(cat => {
+        html += `
+            <div class="zbb-cat-item">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div class="t-icon" style="background-color: ${cat.visual_color}; width: 40px; height: 40px; font-size: 1.1rem; border-radius: 4px; display: flex; justify-content: center; align-items: center; color: var(--bg-primary); border: 1px solid var(--text-primary);">
+                        <i class="fas ${cat.icon}"></i>
+                    </div>
+                    <div>
+                        <span style="font-family: var(--font-heading); font-size: 1.3rem; font-weight: 700; line-height: 1;">${cat.name}</span>
+                        <br><span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">${cat.type === 'income' ? 'Ingreso/Flujo' : (cat.subtype === 'fixed' ? 'Necesidad (50%)' : 'Deseo (30%)')}</span>
+                    </div>
+                </div>
+                <div>
+                    <input type="number" class="zbb-cat-input" data-cat-id="${cat.id}" data-cat-name="${cat.name}" data-cat-type="${cat.type === 'income' ? 'income' : (cat.subtype === 'fixed' ? 'needs' : 'wants')}" placeholder="0.00" oninput="calculateZBBDelta()" inputmode="decimal" step="any">
+                </div>
+            </div>
+        `;
+    });
+    
+    categoriesList.innerHTML = html;
+}
+
+window.updateZBB = function() {
+    const rawIncome = document.getElementById('zbb-income-input').value;
+    const income = parseFloat(rawIncome) || 0;
+    const guideModule = document.getElementById('zbb-guide-module');
+    const floatWidget = document.getElementById('zbb-floating-delta');
+    
+    if(income > 0) {
+        guideModule.classList.remove('hidden');
+        floatWidget.classList.remove('hidden');
+        
+        // Calcular Guía Heurística
+        document.getElementById('zbb-guide-needs').textContent = `$${(income * 0.50).toFixed(2)}`;
+        document.getElementById('zbb-guide-wants').textContent = `$${(income * 0.30).toFixed(2)}`;
+        document.getElementById('zbb-guide-savings').textContent = `$${(income * 0.20).toFixed(2)}`;
+        
+        // Init categories view if empty
+        if(document.getElementById('zbb-categories-list').innerHTML.trim() === '' || document.getElementById('zbb-categories-list').innerHTML.includes('<!-- Injected by JS -->')) {
+            initZBBView();
+        }
+        
+        calculateZBBDelta();
+    } else {
+        guideModule.classList.add('hidden');
+        floatWidget.classList.add('hidden');
+    }
+}
+
+window.calculateZBBDelta = function() {
+    const income = parseFloat(document.getElementById('zbb-income-input').value) || 0;
+    const inputs = document.querySelectorAll('.zbb-cat-input');
+    
+    let totalAssigned = 0;
+    let allocations = [];
+    
+    inputs.forEach(input => {
+        const val = parseFloat(input.value) || 0;
+        if(val > 0) {
+            totalAssigned += val;
+            allocations.push({
+                category_name: input.dataset.catName,
+                amount: val,
+                category_type: input.dataset.catType
+            });
+        }
+    });
+    
+    const delta = income - totalAssigned;
+    const floatWidget = document.getElementById('zbb-floating-delta');
+    const deltaValLabel = document.getElementById('zbb-delta-val');
+    const saveBtn = document.getElementById('zbb-save-plan');
+    
+    deltaValLabel.textContent = `$${delta.toFixed(2)}`;
+    
+    // Cleanup classes
+    floatWidget.classList.remove('status-idle', 'status-perfect', 'status-danger');
+    
+    let currentStatus = 'Capital Ocioso';
+    if(delta === 0 && income > 0) {
+        floatWidget.classList.add('status-perfect');
+        saveBtn.disabled = false;
+        currentStatus = 'Maestría ZBB';
+    } else if(delta > 0) {
+        floatWidget.classList.add('status-idle');
+        saveBtn.disabled = true;
+    } else {
+        floatWidget.classList.add('status-danger');
+        saveBtn.disabled = true;
+        currentStatus = 'Sobreasignación';
+    }
+    
+    // Store in global
+    const now = new Date();
+    currentZBBPlan = {
+        month_id: `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}`,
+        total_income: income,
+        created_at: now.toISOString(),
+        allocations: allocations,
+        metrics: {
+            total_allocated: totalAssigned,
+            delta: delta,
+            status: currentStatus
+        }
+    };
+}
+
+window.saveZBBPlan = function() {
+    if(!currentZBBPlan || currentZBBPlan.metrics.delta !== 0) return;
+    
+    // Guardamos en un registro paralelo en localStorage para historial persistente si se desea,
+    // pero por ahora solo confirmamos visualmente que el plan se guardó en este mes.
+    let zbbHistory = JSON.parse(localStorage.getItem('finance_zbb_history')) || [];
+    // Replace old plan for this month if exists
+    zbbHistory = zbbHistory.filter(p => p.month_id !== currentZBBPlan.month_id);
+    zbbHistory.push(currentZBBPlan);
+    localStorage.setItem('finance_zbb_history', JSON.stringify(zbbHistory));
+    
+    alert(`¡Maestría financiera lograda! Tu plan Base Cero para ${currentZBBPlan.month_id} ha sido almacenado exitosamente.`);
+}
+
+window.exportZBBPlan = function() {
+    let zbbHistory = JSON.parse(localStorage.getItem('finance_zbb_history')) || [];
+    
+    // Si hay un plan actual en pantalla, ofrecemos exportar ese, o el último guardado.
+    let planToExport = null;
+    if(currentZBBPlan && currentZBBPlan.total_income > 0) {
+        planToExport = currentZBBPlan;
+    } else if (zbbHistory.length > 0) {
+        planToExport = zbbHistory[zbbHistory.length - 1]; // tomar el más reciente
+    }
+    
+    if(!planToExport) {
+        alert('No hay un plan ZBB activo o guardado para exportar.');
+        return;
+    }
+    
+    const dataStr = JSON.stringify(planToExport, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ZBB_Plan_${planToExport.month_id}.json`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+}
+
 // Iniciar aplicación
 renderHome();
