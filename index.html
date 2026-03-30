@@ -27,8 +27,8 @@
             <div class="header-actions">
                 <button class="btn-icon" id="theme-toggle" onclick="toggleTheme()" title="Cambiar Tema"><i class="fas fa-moon"></i></button>
                 <input type="file" id="import-csv-file" accept=".csv" style="display: none;" onchange="importFromCSV(event)">
-                <button class="btn-icon" id="import-csv" onclick="document.getElementById('import-csv-file').click()" title="Importar Lienzo (CSV)" style="margin-left: 15px;"><i class="fas fa-file-import"></i></button>
-                <button class="btn-icon" id="export-csv" onclick="exportToCSV()" title="Descargar Lienzo (CSV)" style="margin-left: 15px;"><i class="fas fa-file-csv"></i></button>
+                <button class="btn-icon" id="import-csv" onclick="document.getElementById('import-csv-file').click()" title="Importar Historial (CSV)" style="margin-left: 15px;"><i class="fas fa-file-import"></i></button>
+                <button class="btn-icon" id="export-csv" onclick="exportToCSV()" title="Exportar Datos (CSV)" style="margin-left: 15px;"><i class="fas fa-file-csv"></i></button>
             </div>
         </header>
 
@@ -38,6 +38,24 @@
             <!-- ====== VIEW: HOME ====== -->
             <section id="view-home" class="view active">
                 
+                <!-- Net Worth Panel (Patrimonio Neto) -->
+                <section class="net-worth-panel">
+                    <div class="nw-header">
+                        <h2>Patrimonio Neto <i class="fas fa-info-circle" title="Activos reales - Pasivos exigibles" style="font-size: 0.8rem; color: var(--text-secondary); cursor: pointer;"></i></h2>
+                        <h1 id="total-net-worth">$0.00</h1>
+                    </div>
+                    <div class="nw-breakdown">
+                        <div class="nw-item">
+                            <span class="nw-label"><i class="fas fa-arrow-trend-up nw-icon-asset"></i> Activos Totales</span>
+                            <span class="nw-value" id="total-assets">$0.00</span>
+                        </div>
+                        <div class="nw-item">
+                            <span class="nw-label"><i class="fas fa-arrow-trend-down nw-icon-liability"></i> Pasivos (Deuda)</span>
+                            <span class="nw-value nw-liability" id="total-liabilities">$0.00</span>
+                        </div>
+                    </div>
+                </section>
+
                 <!-- Accounts Carousel -->
                 <div class="accounts-carousel" id="accounts-carousel">
                     <!-- Javascript inyectará las Cuentas aquí -->
@@ -165,7 +183,7 @@
         <div id="transaction-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 id="modal-title">Nuevo Trazo</h2>
+                    <h2 id="modal-title">Nueva Transacción</h2>
                     <button id="close-modal" class="btn-icon" type="button"><i class="fas fa-times"></i></button>
                 </div>
                 <form id="transaction-form">
@@ -177,7 +195,7 @@
                         <input type="date" id="date" required>
                     </div>
                     <div class="input-group">
-                        <label for="tx-account">Billetera Utilizada</label>
+                        <label for="tx-account">Cuenta Utilizada</label>
                         <select id="tx-account" required></select>
                     </div>
                     <div class="input-group">
@@ -189,11 +207,11 @@
                         <select id="category" required></select>
                     </div>
                     <div class="input-group">
-                        <label for="notes">Notas o Emociones (Opcional)</label>
-                        <textarea id="notes" placeholder="Pinturas al óleo..." rows="2"></textarea>
+                        <label for="notes">Notas o Descripción (Opcional)</label>
+                        <textarea id="notes" placeholder="Cena de negocios, pago de servicios..." rows="2"></textarea>
                     </div>
-                    <button type="submit" class="btn btn-save" id="tx-save-btn">Sellar en Lienzo</button>
-                    <button type="button" class="btn btn-secondary hidden mt-10" id="tx-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentTx()">Manchar (Borrar)</button>
+                    <button type="submit" class="btn btn-save" id="tx-save-btn">Registrar Transacción</button>
+                    <button type="button" class="btn btn-secondary hidden mt-10" id="tx-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentTx()">Eliminar Transacción</button>
                 </form>
             </div>
         </div>
@@ -202,13 +220,13 @@
         <div id="account-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 id="modal-title-acc">Nueva Billetera</h2>
+                    <h2 id="modal-title-acc">Nueva Cuenta</h2>
                     <button id="close-acc-modal" class="btn-icon" type="button" onclick="closeAccountModal()"><i class="fas fa-times"></i></button>
                 </div>
                 <form id="account-form">
                     <div class="input-group">
                         <label for="acc-name">Nombre</label>
-                        <input type="text" id="acc-name" placeholder="Ej. Bóveda Suiza" required>
+                        <input type="text" id="acc-name" placeholder="Ej. Cuenta de Ahorros, Visa Crédito" required>
                     </div>
                     <div class="input-group">
                         <label for="acc-currency">Moneda (ISO)</label>
@@ -220,17 +238,17 @@
                         </select>
                     </div>
                     <div class="input-group">
-                        <label for="acc-type">Tipo de Billetera</label>
+                        <label for="acc-type">Tipo de Cuenta (Naturaleza)</label>
                         <select id="acc-type">
-                            <option value="1">Activa (A favor)</option>
-                            <option value="-1">Deuda (En contra)</option>
+                            <option value="asset">Activo (Efectivo, Inversiones, Por Cobrar)</option>
+                            <option value="liability">Pasivo (Tarjetas de Crédito, Préstamos)</option>
                         </select>
                     </div>
                     <div class="input-group">
                         <label for="acc-balance">Balance Inicial</label>
                         <input type="number" id="acc-balance" inputmode="decimal" step="any" placeholder="0.00" required>
                     </div>
-                    <button type="submit" class="btn btn-save">Sellar Billetera</button>
+                    <button type="submit" class="btn btn-save">Registrar Cuenta</button>
                 </form>
             </div>
         </div>
@@ -246,13 +264,20 @@
                     <input type="hidden" id="cat-edit-id">
                     <div class="input-group">
                         <label for="cat-name">Nombre</label>
-                        <input type="text" id="cat-name" placeholder="Ej. Acuarelas" required>
+                        <input type="text" id="cat-name" placeholder="Ej. Vivienda, Suscripciones" required>
                     </div>
                     <div class="input-group">
-                        <label for="cat-type">Tipo de Trazo</label>
-                        <select id="cat-type">
-                            <option value="expense">Gasto</option>
-                            <option value="income">Ingreso</option>
+                        <label for="cat-type">Tipo de Flujo</label>
+                        <select id="cat-type" onchange="toggleCategorySubtype()">
+                            <option value="expense">Gasto (Salida de Capital)</option>
+                            <option value="income">Ingreso (Entrada de Capital)</option>
+                        </select>
+                    </div>
+                    <div class="input-group" id="cat-subtype-group">
+                        <label for="cat-subtype">Categorización Estructural</label>
+                        <select id="cat-subtype">
+                            <option value="fixed">Costo Fijo (Necesidad / Base)</option>
+                            <option value="variable">Costo Variable (Deseo / Discrecional)</option>
                         </select>
                     </div>
                     <div class="input-group">
@@ -272,7 +297,7 @@
                             </div>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-save" id="cat-save-btn">Añadir a la Paleta</button>
+                    <button type="submit" class="btn btn-save" id="cat-save-btn">Guardar Categoría</button>
                     <button type="button" class="btn btn-secondary hidden mt-10" id="cat-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentCategory()">Borrar Categoría</button>
                 </form>
             </div>
@@ -282,7 +307,7 @@
         <div id="transfer-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 id="transfer-modal-h2">Transferencia Divina</h2>
+                    <h2 id="transfer-modal-h2">Transferencia de Fondos</h2>
                     <button class="btn-icon" type="button" onclick="closeTransferModal()"><i class="fas fa-times"></i></button>
                 </div>
                 <form id="transfer-form">
@@ -292,23 +317,23 @@
                         <input type="date" id="trans-date" required>
                     </div>
                     <div class="input-group">
-                        <label for="trans-from">De Bóveda</label>
+                        <label for="trans-from">Cuenta Origen</label>
                         <select id="trans-from" required></select>
                     </div>
                     <div class="input-group">
-                        <label for="trans-to">A Bóveda</label>
+                        <label for="trans-to">Cuenta Destino</label>
                         <select id="trans-to" required></select>
                     </div>
                     <div class="input-group">
-                        <label for="trans-amount">Suma Extraída (Bóveda Origen)</label>
+                        <label for="trans-amount">Monto Retirado (Origen)</label>
                         <input type="number" id="trans-amount" inputmode="decimal" step="any" placeholder="0.00" required>
                     </div>
                     <div class="input-group">
-                        <label for="trans-received">Suma Depositada (Bóveda Destino)</label>
+                        <label for="trans-received">Monto Recibido (Destino)</label>
                         <input type="number" id="trans-received" inputmode="decimal" step="any" placeholder="Ingresa el monto tras el cambio" required>
                     </div>
-                    <button type="submit" class="btn btn-save" id="trans-save-btn">Ejecutar Flujo</button>
-                    <button type="button" class="btn btn-secondary hidden mt-10" id="trans-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentTransfer()">Manchar (Borrar)</button>
+                    <button type="submit" class="btn btn-save" id="trans-save-btn">Registrar Movimiento</button>
+                    <button type="button" class="btn btn-secondary hidden mt-10" id="trans-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentTransfer()">Eliminar Transferencia</button>
                 </form>
             </div>
         </div>
@@ -317,34 +342,38 @@
         <div id="goal-modal" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2 id="goal-modal-title">Nuevo Horizonte</h2>
+                    <h2 id="goal-modal-title">Nuevo Objetivo Financiero</h2>
                     <button class="btn-icon" type="button" onclick="closeGoalModal()"><i class="fas fa-times"></i></button>
                 </div>
                 <form id="goal-form">
                     <input type="hidden" id="goal-edit-id">
                     <div class="input-group">
-                        <label for="goal-name">Inspiración (Meta)</label>
-                        <input type="text" id="goal-name" placeholder="Ej. Retrato en París" required>
+                        <label for="goal-name">Nombre de la Meta</label>
+                        <input type="text" id="goal-name" placeholder="Ej. Fondo de Emergencia, Coche" required>
                     </div>
                     <div class="input-group">
                         <label for="goal-target">Monto Objetivo Final</label>
                         <input type="number" id="goal-target" inputmode="decimal" step="any" placeholder="1000.00" required>
                     </div>
                     <div class="input-group">
-                        <label for="goal-account">Vincular a Bóveda (Opcional)</label>
+                        <label for="goal-account">Vincular a Cuenta (Opcional)</label>
                         <select id="goal-account">
                             <!-- JS fill -->
                         </select>
+                    </div>
+                    <div class="input-group" style="display: flex; align-items: center; gap: 10px; margin-top: 10px; margin-bottom: 20px;">
+                        <input type="checkbox" id="goal-is-emergency" style="width: 20px; height: 20px; accent-color: var(--action-income);">
+                        <label for="goal-is-emergency" style="margin-bottom: 0; font-size: 0.95rem;">Es un Buffer de Riesgo (Fondo de Emergencia)</label>
                     </div>
                     <div class="input-group">
                         <label>Ícono representativo</label>
                         <input type="hidden" id="goal-icon" value="fa-bullseye">
                         <div class="icon-selector" id="goal-icon-selector">
-                            <i class="fas fa-bullseye selected" data-icon="fa-bullseye"></i><i class="fas fa-plane" data-icon="fa-plane"></i><i class="fas fa-car" data-icon="fa-car"></i><i class="fas fa-home" data-icon="fa-home"></i><i class="fas fa-laptop" data-icon="fa-laptop"></i><i class="fas fa-gamepad" data-icon="fa-gamepad"></i><i class="fas fa-graduation-cap" data-icon="fa-graduation-cap"></i><i class="fas fa-ring" data-icon="fa-ring"></i><i class="fas fa-baby" data-icon="fa-baby"></i><i class="fas fa-piggy-bank" data-icon="fa-piggy-bank"></i>
+                            <i class="fas fa-bullseye selected" data-icon="fa-bullseye"></i><i class="fas fa-plane" data-icon="fa-plane"></i><i class="fas fa-car" data-icon="fa-car"></i><i class="fas fa-home" data-icon="fa-home"></i><i class="fas fa-laptop" data-icon="fa-laptop"></i><i class="fas fa-gamepad" data-icon="fa-gamepad"></i><i class="fas fa-graduation-cap" data-icon="fa-graduation-cap"></i><i class="fas fa-ring" data-icon="fa-ring"></i><i class="fas fa-baby" data-icon="fa-baby"></i><i class="fas fa-piggy-bank" data-icon="fa-piggy-bank"></i><i class="fas fa-shield-alt" data-icon="fa-shield-alt" title="Fondo Emergencia"></i>
                         </div>
                     </div>
-                    <button type="submit" class="btn btn-save" id="goal-save-btn">Sellar Meta</button>
-                    <button type="button" class="btn btn-secondary hidden mt-10" id="goal-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentGoal()">Abandonar Visión (Borrar)</button>
+                    <button type="submit" class="btn btn-save" id="goal-save-btn">Guardar Meta</button>
+                    <button type="button" class="btn btn-secondary hidden mt-10" id="goal-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentGoal()">Eliminar Meta</button>
                 </form>
             </div>
         </div>

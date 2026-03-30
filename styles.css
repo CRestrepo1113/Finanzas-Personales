@@ -45,6 +45,28 @@ body {
 .view.active { display: block; }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
 
+/* Net Worth Panel */
+.net-worth-panel {
+    background-color: var(--bg-card);
+    border: 2px solid var(--text-primary);
+    border-radius: 8px 18px 4px 12px;
+    box-shadow: 6px 6px 0px 0px var(--text-primary);
+    padding: 25px 20px;
+    margin-bottom: 25px;
+    position: relative;
+    overflow: hidden;
+}
+.nw-header { display: flex; flex-direction: column; align-items: flex-start; margin-bottom: 15px; border-bottom: 2px dashed var(--text-secondary); padding-bottom: 15px;}
+.nw-header h2 { font-family: var(--font-heading); font-size: 1.4rem; color: var(--text-primary); }
+#total-net-worth { font-family: var(--font-heading); font-size: 3rem; font-weight: 700; line-height: 1; margin-top: 5px;}
+.nw-breakdown { display: flex; justify-content: space-between; gap: 10px;}
+.nw-item { display: flex; flex-direction: column; flex: 1; }
+.nw-label { font-size: 0.85rem; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 5px; }
+.nw-value { font-family: var(--font-body); font-size: 1.3rem; font-weight: 700; }
+.nw-liability { color: var(--action-expense); }
+.nw-icon-asset { color: var(--action-income); margin-right: 5px; }
+.nw-icon-liability { color: var(--action-expense); margin-right: 5px; }
+
 /* Accounts Carousel */
 .accounts-carousel { display: flex; gap: 15px; overflow-x: auto; padding: 10px 0 20px 0; scroll-snap-type: x mandatory; margin-right: -20px; padding-right: 20px; }
 .accounts-carousel::-webkit-scrollbar { display: none; }

@@ -1,24 +1,28 @@
-// 1. Initial State DB (V2)
+// 1. Initial State DB (V3 - Phase I Engineering)
 const initDB = {
     accounts: [
-        { id: 1, name: 'Billetera Principal', currency: 'USD', balance: 1222.00 }
+        { id: 1, name: 'Cuenta de Ahorros', currency: 'USD', balance: 1222.00, type: 'asset' },
+        { id: 2, name: 'Tarjeta Especial', currency: 'USD', balance: -200.00, type: 'liability' }
     ],
     categories: [
-        { id: 1, name: 'Comestibles', type: 'expense', visual_color: '#B23A1E', icon: 'fa-shopping-basket', budget: 500 },
-        { id: 2, name: 'Sueldo', type: 'income', visual_color: '#005F56', icon: 'fa-briefcase', budget: 0 },
-        { id: 3, name: 'Facturas', type: 'expense', visual_color: '#2B2B2B', icon: 'fa-file-invoice-dollar', budget: 0 },
-        { id: 4, name: 'Lienzos', type: 'expense', visual_color: '#DDA629', icon: 'fa-masks-theater', budget: 100 }
+        { id: 1, name: 'Sueldo', type: 'income', subtype: 'fixed', visual_color: '#005F56', icon: 'fa-briefcase', budget: 0 },
+        { id: 2, name: 'Vivienda', type: 'expense', subtype: 'fixed', visual_color: '#2B2B2B', icon: 'fa-home', budget: 800 },
+        { id: 3, name: 'Comestibles', type: 'expense', subtype: 'variable', visual_color: '#B23A1E', icon: 'fa-shopping-basket', budget: 400 },
+        { id: 4, name: 'Suscripciones', type: 'expense', subtype: 'fixed', visual_color: '#DDA629', icon: 'fa-credit-card', budget: 50 },
+        { id: 5, name: 'Transporte', type: 'expense', subtype: 'variable', visual_color: '#00A896', icon: 'fa-car', budget: 150 }
     ],
     transactions: [],
     goals: [
-        { id: 1, name: 'Fondo Europeo', target: 5000, current: 2300, icon: 'fa-plane', account_id: null }
+        { id: 1, name: 'Fondo de Emergencia', target: 5000, current: 2300, icon: 'fa-shield-alt', account_id: null, is_emergency: true }
     ]
 };
 
-let db = JSON.parse(localStorage.getItem('schiele_db')) || initDB;
+let db = JSON.parse(localStorage.getItem('finance_db_v3')) || initDB;
 // Patches for backward compatibility
 db.transactions.forEach(t => { if(!t.type) t.type = 'standard'; });
-db.categories.forEach(c => { if(c.budget === undefined) c.budget = 0; });
+db.categories.forEach(c => { if(c.budget === undefined) c.budget = 0; if(!c.subtype) c.subtype = 'variable'; });
+db.accounts.forEach(a => { if(!a.type) a.type = a.balance < 0 ? 'liability' : 'asset'; });
+db.goals.forEach(g => { if(g.is_emergency === undefined) g.is_emergency = false; });
 
 let currentType = 'expense';
 let currentAnalyticsFilter = 'all';
@@ -72,6 +76,15 @@ window.toggleAnalyticsFilter = function(type) {
     renderAnalytics();
 }
 
+window.toggleCategorySubtype = function() {
+    const type = document.getElementById('cat-type').value;
+    const group = document.getElementById('cat-subtype-group');
+    if(group) {
+        if(type === 'income') group.classList.add('hidden');
+        else group.classList.remove('hidden');
+    }
+}
+
 // Transaction Helpers
 function renderTransactionHTML(tx) {
     if(tx.type === 'transfer') {
@@ -121,7 +134,7 @@ window.openEditDispatcher = function(id) {
 // Modals: Transactions (Income/Expense/Transfers)
 window.openModal = function(type, txId = null) {
     currentType = type;
-    document.getElementById('modal-title').textContent = txId ? 'Retocar Trazo' : (type === 'expense' ? 'Registrar Gasto' : 'Registrar Ingreso');
+    document.getElementById('modal-title').textContent = txId ? 'Editar Transacción' : (type === 'expense' ? 'Registrar Gasto' : 'Registrar Ingreso');
     accSelect.innerHTML = db.accounts.map(a => `<option value="${a.id}">${a.name} (${a.currency})</option>`).join('');
     catSelect.innerHTML = db.categories.filter(c => c.type === type).map(c => `<option value="${c.id}">${c.name}</option>`).join('');
     
@@ -133,12 +146,12 @@ window.openModal = function(type, txId = null) {
         document.getElementById('notes').value = tx.notes || '';
         accSelect.value = tx.account_id;
         catSelect.value = tx.category_id;
-        document.getElementById('tx-save-btn').textContent = "Aplicar Retoque";
+        document.getElementById('tx-save-btn').textContent = "Guardar Cambios";
         document.getElementById('tx-delete-btn').classList.remove('hidden');
     } else {
         document.getElementById('tx-edit-id').value = "";
         document.getElementById('date').value = new Date().toISOString().split('T')[0];
-        document.getElementById('tx-save-btn').textContent = "Sellar en Lienzo";
+        document.getElementById('tx-save-btn').textContent = "Registrar Transacción";
         document.getElementById('tx-delete-btn').classList.add('hidden');
     }
     txModal.classList.remove('hidden');
@@ -177,7 +190,7 @@ txForm.addEventListener('submit', (e) => {
 window.deleteCurrentTx = function() {
     const editId = document.getElementById('tx-edit-id').value;
     if(!editId) return;
-    if(confirm("¿Estás seguro de blanquear este trazo?")) {
+    if(confirm("¿Estás seguro de eliminar esta transacción?")) {
         const oldTx = db.transactions.find(t => t.id === editId);
         const oldAcc = db.accounts.find(a => a.id === oldTx.account_id);
         const oldCat = db.categories.find(c => c.id === oldTx.category_id) || {type: 'expense'};
@@ -205,15 +218,15 @@ window.openTransferModal = (txId = null, preselectToAccountId = null) => {
         document.getElementById('trans-amount').value = tx.amount_extracted;
         document.getElementById('trans-received').value = tx.amount_received;
         
-        document.getElementById('transfer-modal-h2').textContent = "Retocar Transferencia";
-        document.getElementById('trans-save-btn').textContent = "Aplicar Retoque";
+        document.getElementById('transfer-modal-h2').textContent = "Editar Transferencia";
+        document.getElementById('trans-save-btn').textContent = "Guardar Cambios";
         document.getElementById('trans-delete-btn').classList.remove('hidden');
     } else {
         document.getElementById('trans-edit-id').value = "";
         document.getElementById('trans-date').value = new Date().toISOString().split('T')[0];
         if (preselectToAccountId) targetTo.value = preselectToAccountId;
-        document.getElementById('transfer-modal-h2').textContent = "Transferencia Divina";
-        document.getElementById('trans-save-btn').textContent = "Ejecutar Flujo";
+        document.getElementById('transfer-modal-h2').textContent = "Transferencia de Fondos";
+        document.getElementById('trans-save-btn').textContent = "Registrar Movimiento";
         document.getElementById('trans-delete-btn').classList.add('hidden');
     }
     transferModal.classList.remove('hidden');
@@ -228,7 +241,7 @@ transferForm.addEventListener('submit', (e) => {
     const amountReceived = parseFloat(document.getElementById('trans-received').value);
     const dateVal = document.getElementById('trans-date').value + "T12:00:00.000Z";
 
-    if(fromId === toId) return alert("Pincelada redundante: La misma bóveda de origen y destino.");
+    if(fromId === toId) return alert("Operación inválida: La cuenta de origen no puede ser la misma que la de destino.");
     const fromAcc = db.accounts.find(a => a.id === fromId);
     const toAcc = db.accounts.find(a => a.id === toId);
 
@@ -259,7 +272,7 @@ transferForm.addEventListener('submit', (e) => {
 window.deleteCurrentTransfer = function() {
     const editId = document.getElementById('trans-edit-id').value;
     if(!editId) return;
-    if(confirm("¿Desvanecer esta transferencia del historial?")) {
+    if(confirm("¿Eliminar permanentemente esta transferencia del historial?")) {
         const oldTx = db.transactions.find(t => t.id === editId);
         const oldFrom = db.accounts.find(a => a.id === oldTx.from_account_id);
         const oldTo = db.accounts.find(a => a.id === oldTx.to_account_id);
@@ -278,16 +291,17 @@ window.openAccountModal = () => accModal.classList.remove('hidden');
 window.closeAccountModal = () => { accModal.classList.add('hidden'); accForm.reset(); };
 accForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const typeMultiplier = document.getElementById('acc-type') ? parseFloat(document.getElementById('acc-type').value) : 1;
+    const type = document.getElementById('acc-type').value;
     let finalBalance = parseFloat(document.getElementById('acc-balance').value);
     
-    // Si la persona ya escribe un negativo, respetamos el signo. Si escribe positivo en 'Deuda', lo hacemos negativo.
-    if(typeMultiplier === -1 && finalBalance > 0) finalBalance = -finalBalance;
-    if(typeMultiplier === 1 && finalBalance < 0) finalBalance = Math.abs(finalBalance);
+    // Respetar signo para liabilities, pero asegurarlo.
+    if(type === 'liability' && finalBalance > 0) finalBalance = -finalBalance;
+    if(type === 'asset' && finalBalance < 0) finalBalance = Math.abs(finalBalance);
 
     db.accounts.push({
         id: Date.now(), name: document.getElementById('acc-name').value,
-        currency: document.getElementById('acc-currency').value, balance: finalBalance
+        currency: document.getElementById('acc-currency').value, balance: finalBalance,
+        type: type
     });
     saveDB(); closeAccountModal(); renderHome(); renderSettings();
 });
@@ -301,18 +315,24 @@ window.openCategoryModal = (catId = null) => {
         document.getElementById('cat-budget').value = c.budget || "";
         document.getElementById('cat-color').value = c.visual_color;
         document.getElementById('cat-icon').value = c.icon || 'fa-tag';
+        if(document.getElementById('cat-subtype')) {
+            document.getElementById('cat-subtype').value = c.subtype || 'variable';
+            toggleCategorySubtype();
+        }
         
         document.querySelectorAll('#cat-icon-selector i').forEach(i => i.classList.remove('selected'));
         const activeIcon = document.querySelector(`#cat-icon-selector i[data-icon="${c.icon || 'fa-tag'}"]`);
         if(activeIcon) activeIcon.classList.add('selected');
 
-        document.getElementById('modal-title-cat').textContent = "Retocar Categoría";
-        document.getElementById('cat-save-btn').textContent = "Aplicar Trazos";
+        document.getElementById('modal-title-cat').textContent = "Editar Categoría";
+        document.getElementById('cat-save-btn').textContent = "Guardar Cambios";
         document.getElementById('cat-delete-btn').classList.remove('hidden');
     } else {
         document.getElementById('cat-edit-id').value = "";
+        if(document.getElementById('cat-subtype')) document.getElementById('cat-subtype').value = 'variable';
+        toggleCategorySubtype();
         document.getElementById('modal-title-cat').textContent = "Nueva Categoría";
-        document.getElementById('cat-save-btn').textContent = "Añadir a la Paleta";
+        document.getElementById('cat-save-btn').textContent = "Guardar Categoría";
         document.getElementById('cat-delete-btn').classList.add('hidden');
         document.getElementById('cat-budget').value = "";
     }
@@ -325,6 +345,8 @@ catForm.addEventListener('submit', (e) => {
     const editId = document.getElementById('cat-edit-id').value;
     const name = document.getElementById('cat-name').value;
     const type = document.getElementById('cat-type').value;
+    const subtypeElem = document.getElementById('cat-subtype');
+    const subtype = (type === 'expense' && subtypeElem) ? subtypeElem.value : 'fixed';
     const budgetRaw = document.getElementById('cat-budget').value;
     const budget = budgetRaw ? parseFloat(budgetRaw) : 0;
     const visual_color = document.getElementById('cat-color').value;
@@ -332,10 +354,10 @@ catForm.addEventListener('submit', (e) => {
 
     if (editId) {
         const c = db.categories.find(x => x.id === parseInt(editId));
-        c.name = name; c.type = type; c.budget = budget; c.visual_color = visual_color; c.icon = icon;
+        c.name = name; c.type = type; c.budget = budget; c.visual_color = visual_color; c.icon = icon; c.subtype = subtype;
     } else {
         db.categories.push({
-            id: Date.now(), name, type, budget, visual_color, icon
+            id: Date.now(), name, type, subtype, budget, visual_color, icon
         });
     }
     saveDB(); closeCategoryModal(); renderSettings();
@@ -345,8 +367,8 @@ catForm.addEventListener('submit', (e) => {
 window.deleteCurrentCategory = function() {
     const editId = document.getElementById('cat-edit-id').value;
     if(!editId) return;
-    if(db.categories.length <= 1) return alert("Pintura destrozada: No puedes destruir tu última categoría.");
-    if(confirm("¿Borrar este tinte permanente?")) { 
+    if(db.categories.length <= 1) return alert("Acción denegada: El sistema requiere al menos una categoría vital.");
+    if(confirm("¿Deseas eliminar permanentemente esta categoría estructural?")) { 
         db.categories = db.categories.filter(c => c.id !== parseInt(editId)); 
         saveDB(); closeCategoryModal(); renderSettings(); 
         if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
@@ -367,17 +389,22 @@ window.openGoalModal = (goalId = null) => {
         document.getElementById('goal-account').value = g.account_id || "";
         document.getElementById('goal-icon').value = g.icon || "fa-bullseye";
         
+        const isEmergencyElem = document.getElementById('goal-is-emergency');
+        if(isEmergencyElem) isEmergencyElem.checked = g.is_emergency || false;
+        
         document.querySelectorAll('#goal-icon-selector i').forEach(i => i.classList.remove('selected'));
         const activeIcon = document.querySelector(`#goal-icon-selector i[data-icon="${g.icon || 'fa-bullseye'}"]`);
         if(activeIcon) activeIcon.classList.add('selected');
 
-        document.getElementById('goal-modal-title').textContent = "Retocar Meta";
-        document.getElementById('goal-save-btn').textContent = "Aplicar Trazos";
+        document.getElementById('goal-modal-title').textContent = "Editar Meta / Fondo";
+        document.getElementById('goal-save-btn').textContent = "Guardar Cambios";
         document.getElementById('goal-delete-btn').classList.remove('hidden');
     } else {
         document.getElementById('goal-edit-id').value = "";
-        document.getElementById('goal-modal-title').textContent = "Nuevo Horizonte";
-        document.getElementById('goal-save-btn').textContent = "Sellar Meta";
+        const isEmergencyElem = document.getElementById('goal-is-emergency');
+        if(isEmergencyElem) isEmergencyElem.checked = false;
+        document.getElementById('goal-modal-title').textContent = "Nuevo Horizonte Económico";
+        document.getElementById('goal-save-btn').textContent = "Registrar Meta";
         document.getElementById('goal-delete-btn').classList.add('hidden');
     }
     goalModal.classList.remove('hidden');
@@ -393,12 +420,14 @@ goalForm.addEventListener('submit', (e) => {
     const icon = document.getElementById('goal-icon').value || 'fa-bullseye';
     const rawAccId = document.getElementById('goal-account').value;
     const accId = rawAccId ? parseInt(rawAccId) : null;
+    const isEmergencyElem = document.getElementById('goal-is-emergency');
+    const isEmergency = isEmergencyElem ? isEmergencyElem.checked : false;
 
     if (editId) {
         const g = db.goals.find(x => x.id === parseInt(editId));
-        g.name = name; g.target = target; g.icon = icon; g.account_id = accId;
+        g.name = name; g.target = target; g.icon = icon; g.account_id = accId; g.is_emergency = isEmergency;
     } else {
-        db.goals.push({ id: Date.now(), name, target, current: 0, icon, account_id: accId });
+        db.goals.push({ id: Date.now(), name, target, current: 0, icon, account_id: accId, is_emergency: isEmergency });
     }
     saveDB(); closeGoalModal(); renderHome(); renderSettings();
 });
@@ -406,7 +435,7 @@ goalForm.addEventListener('submit', (e) => {
 window.deleteCurrentGoal = function() {
     const editId = document.getElementById('goal-edit-id').value;
     if(!editId) return;
-    if(confirm("¿Abandonar esta visión (Borrar Meta)?")) {
+    if(confirm("¿Abandonar este objetivo económico (Borrar Meta)?")) {
         db.goals = db.goals.filter(g => g.id !== parseInt(editId));
         saveDB(); closeGoalModal(); renderHome(); renderSettings();
     }
@@ -430,21 +459,39 @@ fundGoalForm.addEventListener('submit', (e) => {
 });
 
 window.deleteAccount = function(id) {
-    if(db.accounts.length <= 1) return alert("Pintura destrozada: No puedes destruir tu última bóveda.");
-    if(confirm("¿Destruir billetera?")) { db.accounts = db.accounts.filter(a => a.id !== id); saveDB(); renderHome(); renderSettings(); }
+    if(db.accounts.length <= 1) return alert("Acción denegada: No puedes destruir tu última cuenta estructurada.");
+    if(confirm("¿Eliminar cuenta permanentemente?")) { db.accounts = db.accounts.filter(a => a.id !== id); saveDB(); renderHome(); renderSettings(); }
 }
 window.deleteGoal = function(id) {
-    if(confirm("¿Rendirte con esta meta?")) { db.goals = db.goals.filter(g => g.id !== id); saveDB(); renderHome(); renderSettings(); }
+    if(confirm("¿Renunciar a este objetivo?")) { db.goals = db.goals.filter(g => g.id !== id); saveDB(); renderHome(); renderSettings(); }
 }
 
 function saveDB() { 
     db.transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
-    localStorage.setItem('schiele_db', JSON.stringify(db)); 
+    localStorage.setItem('finance_db_v3', JSON.stringify(db)); 
 }
 
 
 // -- RENDER HTML INTERFACE --
+function renderNetWorth() {
+    let tAssets = 0; let tLiabilities = 0;
+    db.accounts.forEach(acc => {
+        if(acc.type === 'asset' && acc.balance > 0) tAssets += acc.balance;
+        else if (acc.type === 'asset' && acc.balance < 0) tLiabilities += Math.abs(acc.balance); // En caso de sobregiro
+        
+        if(acc.type === 'liability' && acc.balance < 0) tLiabilities += Math.abs(acc.balance);
+        else if (acc.type === 'liability' && acc.balance > 0) tAssets += acc.balance; // En caso de pago excedente
+    });
+    
+    const net = tAssets - tLiabilities;
+    
+    document.getElementById('total-net-worth').textContent = `$${net.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+    document.getElementById('total-assets').textContent = `$${tAssets.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+    document.getElementById('total-liabilities').textContent = `$${tLiabilities.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+}
+
 function renderHome() {
+    renderNetWorth();
     accountsCarousel.innerHTML = db.accounts.map(acc => {
         const balanceColor = acc.balance < 0 ? 'color: var(--action-expense);' : '';
         return `
@@ -457,10 +504,10 @@ function renderHome() {
     `}).join('');
 
     const recents = db.transactions.slice(0, 10);
-    if(recents.length === 0) { transactionsList.innerHTML = '<div class="empty-state">El lienzo está en blanco.</div>'; } 
+    if(recents.length === 0) { transactionsList.innerHTML = '<div class="empty-state">No hay fluidez en el estado. Registra transacciones del sistema.</div>'; } 
     else { transactionsList.innerHTML = recents.map(tx => renderTransactionHTML(tx)).join(''); }
 
-    if(db.goals.length === 0) { savingsList.innerHTML = '<div class="empty-state">No hay metas artísticas trazadas.</div>'; }
+    if(db.goals.length === 0) { savingsList.innerHTML = '<div class="empty-state">No hay vectores de inversión ni fondos trazados.</div>'; }
     else {
         savingsList.innerHTML = db.goals.map(g => {
             const currentAmount = g.account_id ? (db.accounts.find(a => a.id === g.account_id)?.balance || 0) : (g.current || 0);
