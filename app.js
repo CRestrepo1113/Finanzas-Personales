@@ -1103,7 +1103,7 @@ let currentZBBPlan = {};
 
 function initZBBView() {
     const categoriesList = document.getElementById('zbb-categories-list');
-    const allCategories = db.categories;
+    const allCategories = db.categories.filter(c => c.type === 'expense');
     
     if(allCategories.length === 0) {
         categoriesList.innerHTML = '<div class="empty-state">No hay categorías para presupuestar. Crea algunas en Configuración.</div>';
