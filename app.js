@@ -1,5 +1,9 @@
 // 1. Initial State DB (V3 - Phase I Engineering)
 const initDB = {
+    settings: {
+        baseCurrency: 'USD',
+        exchangeRates: { 'USD': 1, 'EUR': 0.92, 'COP': 3900, 'RUB': 90 }
+    },
     accounts: [
         { id: 1, name: 'Cuenta de Ahorros', currency: 'USD', balance: 1222.00, type: 'asset' },
         { id: 2, name: 'Tarjeta Especial', currency: 'USD', balance: -200.00, type: 'liability' }
@@ -19,6 +23,7 @@ const initDB = {
 
 let db = JSON.parse(localStorage.getItem('finance_db_v3')) || initDB;
 // Patches for backward compatibility
+if(!db.settings) db.settings = { baseCurrency: 'USD', exchangeRates: { 'USD': 1, 'EUR': 0.92, 'COP': 3900, 'RUB': 90 } };
 db.transactions.forEach(t => { if(!t.type) t.type = 'standard'; });
 db.categories.forEach(c => { if(c.budget === undefined) c.budget = 0; if(!c.subtype) c.subtype = 'variable'; });
 db.accounts.forEach(a => { if(!a.type) a.type = a.balance < 0 ? 'liability' : 'asset'; });
@@ -475,19 +480,25 @@ function saveDB() {
 // -- RENDER HTML INTERFACE --
 function renderNetWorth() {
     let tAssets = 0; let tLiabilities = 0;
+    const baseCur = db.settings.baseCurrency || 'USD';
+    const rates = db.settings.exchangeRates || {USD: 1, EUR: 0.92, COP: 3900, RUB: 90};
+
     db.accounts.forEach(acc => {
-        if(acc.type === 'asset' && acc.balance > 0) tAssets += acc.balance;
-        else if (acc.type === 'asset' && acc.balance < 0) tLiabilities += Math.abs(acc.balance); // En caso de sobregiro
+        const rate = rates[acc.currency] || 1;
+        const baseValue = acc.balance / rate;
+
+        if(acc.type === 'asset' && acc.balance > 0) tAssets += baseValue;
+        else if (acc.type === 'asset' && acc.balance < 0) tLiabilities += Math.abs(baseValue); // En caso de sobregiro
         
-        if(acc.type === 'liability' && acc.balance < 0) tLiabilities += Math.abs(acc.balance);
-        else if (acc.type === 'liability' && acc.balance > 0) tAssets += acc.balance; // En caso de pago excedente
+        if(acc.type === 'liability' && acc.balance < 0) tLiabilities += Math.abs(baseValue);
+        else if (acc.type === 'liability' && acc.balance > 0) tAssets += baseValue; // En caso de pago excedente
     });
     
     const net = tAssets - tLiabilities;
     
-    document.getElementById('total-net-worth').textContent = `$${net.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
-    document.getElementById('total-assets').textContent = `$${tAssets.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
-    document.getElementById('total-liabilities').textContent = `$${tLiabilities.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+    document.getElementById('total-net-worth').textContent = `${baseCur} ${net.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+    document.getElementById('total-assets').textContent = `${baseCur} ${tAssets.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
+    document.getElementById('total-liabilities').textContent = `${baseCur} ${tLiabilities.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits:2})}`;
 }
 
 function renderHome() {
@@ -700,7 +711,67 @@ window.renderAnalytics = function() {
     }
 }
 
+function renderExchangeRatesUI() {
+    const container = document.getElementById('settings-exchange-rates');
+    if(!container) return;
+    
+    const availableCurrencies = ['USD', 'EUR', 'COP', 'RUB'];
+    const baseCur = db.settings.baseCurrency || 'USD';
+    
+    let html = `
+        <div class="input-group">
+            <label>Moneda Base del Patrimonio</label>
+            <select id="base-currency-select" onchange="updateBaseCurrency()">
+                ${availableCurrencies.map(c => `<option value="${c}" ${baseCur === c ? 'selected' : ''}>${c}</option>`).join('')}
+            </select>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 10px;">Ingresa la tasa de cambio: <br>¿Cuántas unidades equivalen a <strong>1 ${baseCur}</strong>?</p>
+    `;
+    
+    availableCurrencies.forEach(c => {
+        if(c === baseCur) return;
+        const rate = db.settings.exchangeRates[c] || 1;
+        html += `
+            <div class="setting-row" style="border-bottom: 1px dotted var(--text-secondary); padding: 5px 0;">
+                <span style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+                    <span><strong>${c}</strong></span>
+                    <input type="number" id="rate-${c}" value="${rate}" step="any" inputmode="decimal" 
+                           style="width: 120px; padding: 5px; font-family: var(--font-body); border-radius: 4px; border: 2px solid var(--text-primary); text-align: right; background: var(--bg-primary); color: var(--text-primary);">
+                </span>
+            </div>
+        `;
+    });
+    
+    html += `<button class="btn btn-save" style="padding: 10px; margin-top: 15px; font-size: 1.1rem;" onclick="saveExchangeRates()">Actualizar Matriz</button>`;
+    
+    container.innerHTML = html;
+}
+
+window.updateBaseCurrency = function() {
+    const newBase = document.getElementById('base-currency-select').value;
+    db.settings.baseCurrency = newBase;
+    db.settings.exchangeRates[newBase] = 1;
+    saveDB();
+    renderSettings();
+    renderHome();
+}
+
+window.saveExchangeRates = function() {
+    const availableCurrencies = ['USD', 'EUR', 'COP', 'RUB'];
+    availableCurrencies.forEach(c => {
+        if(c === db.settings.baseCurrency) return;
+        const input = document.getElementById(`rate-${c}`);
+        if(input) {
+            db.settings.exchangeRates[c] = parseFloat(input.value) || 1;
+        }
+    });
+    saveDB(); 
+    renderHome(); 
+    alert("Matriz de tipos de cambio guardada. Patrimonio estructurado.");
+}
+
 function renderSettings() {
+    renderExchangeRatesUI();
     document.getElementById('settings-accounts').innerHTML = db.accounts.map(a => {
         const balanceColor = a.balance < 0 ? 'color: var(--action-expense); font-weight: bold;' : '';
         return `
