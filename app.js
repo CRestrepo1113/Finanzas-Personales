@@ -1218,7 +1218,28 @@ function initZBBView() {
                     </div>
                 </div>
                 <div>
-                    <input type="number" class="zbb-cat-input" data-cat-id="goal-${goal.id}" data-is-goal="true" data-cat-name="${goal.name}" data-cat-type="future" placeholder="0.00" oninput="calculateZBBDelta()" inputmode="decimal" step="any">
+                    <input type="number" class="zbb-cat-input" data-cat-id="goal-${goal.id}" data-cat-name="${goal.name}" data-cat-type="future" placeholder="0.00" oninput="calculateZBBDelta()" inputmode="decimal" step="any">
+                </div>
+            </div>
+        `;
+    });
+
+    // 3. Pasivos / Deudas (Futuros)
+    const liabilities = db.accounts.filter(a => a.type === 'liability');
+    liabilities.forEach(account => {
+        html += `
+            <div class="zbb-cat-item">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div class="t-icon" style="background-color: #DDA629; width: 40px; height: 40px; font-size: 1.1rem; border-radius: 4px; display: flex; justify-content: center; align-items: center; color: var(--bg-primary); border: 1px solid var(--text-primary);">
+                        <i class="fas fa-credit-card"></i>
+                    </div>
+                    <div>
+                        <span style="font-family: var(--font-heading); font-size: 1.3rem; font-weight: 700; line-height: 1;">${account.name}</span>
+                        <br><span style="font-size: 0.8rem; color: #DDA629; text-transform: uppercase; font-weight: 700;">FUTURO (20%)</span>
+                    </div>
+                </div>
+                <div>
+                    <input type="number" class="zbb-cat-input" data-cat-id="acc-${account.id}" data-cat-name="${account.name}" data-cat-type="future" placeholder="0.00" oninput="calculateZBBDelta()" inputmode="decimal" step="any">
                 </div>
             </div>
         `;
@@ -1324,7 +1345,7 @@ window.syncZBBToBudgets = function() {
     let synced = 0;
 
     inputs.forEach(input => {
-        if(input.dataset.isGoal === "true") return; // Ignoramos las metas de Futuro para topes de categoría
+        if(input.dataset.catType === "future") return; // Ignoramos las metas de Futuro y pasivos para topes de categoría
         const catId = input.dataset.catId;
         const val = parseFloat(input.value) || 0;
         const cat = db.categories.find(c => String(c.id) === String(catId));
