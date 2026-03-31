@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#F4ECD8">
     <title>Finanzas Personales</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="styles.css?v=3.6">
+    <link rel="stylesheet" href="styles.css?v=3.7">
     
     <!-- Google Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -406,6 +406,10 @@
                         <label for="trans-received">Monto Recibido (Destino)</label>
                         <input type="number" id="trans-received" inputmode="decimal" step="any" placeholder="Ingresa el monto tras el cambio" required>
                     </div>
+                    <div class="input-group">
+                        <label for="trans-comment">Comentario (Opcional)</label>
+                        <input type="text" id="trans-comment" placeholder="Motivo de la transferencia..." autocomplete="off">
+                    </div>
                     <button type="submit" class="btn btn-save" id="trans-save-btn">Registrar Movimiento</button>
                     <button type="button" class="btn btn-secondary hidden mt-10" id="trans-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentTransfer()">Eliminar Transferencia</button>
                 </form>
@@ -472,6 +476,6 @@
 
     </div>
     
-    <script src="app.js?v=3.6"></script>
+    <script src="app.js?v=3.7"></script>
 </body>
 </html>

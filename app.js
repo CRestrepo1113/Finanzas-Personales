@@ -108,7 +108,7 @@ function renderTransactionHTML(tx) {
             <div class="t-left">
                 <div class="t-icon" style="background-color: var(--text-secondary); color: var(--bg-primary);"><i class="fas fa-exchange-alt"></i></div>
                 <div>
-                    <span class="t-cat" style="font-size: 1.1rem;">Transferencia</span>
+                    <span class="t-cat" style="font-size: 1.1rem;">${tx.comment || 'Transferencia'}</span>
                     <span class="t-date">${new Date(tx.date).toLocaleDateString()} &bull; ${fAcc.name} ➔ ${tAcc.name}</span>
                 </div>
             </div>
@@ -240,6 +240,7 @@ window.openTransferModal = (txId = null, preselectToAccountId = null) => {
         targetTo.value = tx.to_account_id;
         document.getElementById('trans-amount').value = tx.amount_extracted;
         document.getElementById('trans-received').value = tx.amount_received;
+        document.getElementById('trans-comment').value = tx.comment || '';
         
         document.getElementById('transfer-modal-h2').textContent = "Editar Transferencia";
         document.getElementById('trans-save-btn').textContent = "Guardar Cambios";
@@ -247,6 +248,7 @@ window.openTransferModal = (txId = null, preselectToAccountId = null) => {
     } else {
         document.getElementById('trans-edit-id').value = "";
         document.getElementById('trans-date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('trans-comment').value = "";
         if (preselectToAccountId) targetTo.value = preselectToAccountId;
         document.getElementById('transfer-modal-h2').textContent = "Transferencia de Fondos";
         document.getElementById('trans-save-btn').textContent = "Registrar Movimiento";
@@ -262,6 +264,7 @@ transferForm.addEventListener('submit', (e) => {
     const toId = parseInt(targetTo.value);
     const amountExtracted = parseFloat(document.getElementById('trans-amount').value);
     const amountReceived = parseFloat(document.getElementById('trans-received').value);
+    const commentVal = document.getElementById('trans-comment').value.trim();
     const dateVal = document.getElementById('trans-date').value + "T00:00:00"; // Hora local, sin desfase UTC
 
     if(fromId === toId) return alert("Operación inválida: La cuenta de origen no puede ser la misma que la de destino.");
@@ -279,11 +282,12 @@ transferForm.addEventListener('submit', (e) => {
 
         oldTx.from_account_id = fromId; oldTx.to_account_id = toId;
         oldTx.amount_extracted = amountExtracted; oldTx.amount_received = amountReceived;
+        oldTx.comment = commentVal;
         oldTx.date = dateVal;
     } else {
         db.transactions.push({
             id: crypto.randomUUID(), type: 'transfer', from_account_id: fromId, to_account_id: toId,
-            amount_extracted: amountExtracted, amount_received: amountReceived, date: dateVal
+            amount_extracted: amountExtracted, amount_received: amountReceived, comment: commentVal, date: dateVal
         });
     }
 
