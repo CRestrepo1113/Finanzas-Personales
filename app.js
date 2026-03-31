@@ -1153,14 +1153,18 @@ let currentZBBPlan = {};
 function initZBBView() {
     const categoriesList = document.getElementById('zbb-categories-list');
     const allCategories = db.categories.filter(c => c.type === 'expense');
+    const allGoals = db.goals || [];
     
-    if(allCategories.length === 0) {
-        categoriesList.innerHTML = '<div class="empty-state">No hay categorías para presupuestar. Crea algunas en Configuración.</div>';
+    if(allCategories.length === 0 && allGoals.length === 0) {
+        categoriesList.innerHTML = '<div class="empty-state">No hay categorías ni metas para presupuestar. Crea algunas en Configuración.</div>';
         return;
     }
 
     let html = '';
-    allCategories.forEach(cat => {
+    
+    // 1a. Gastos: Necesidades (50%)
+    const needs = allCategories.filter(c => c.subtype === 'fixed');
+    needs.forEach(cat => {
         html += `
             <div class="zbb-cat-item">
                 <div style="display: flex; align-items: center; gap: 15px;">
@@ -1169,11 +1173,52 @@ function initZBBView() {
                     </div>
                     <div>
                         <span style="font-family: var(--font-heading); font-size: 1.3rem; font-weight: 700; line-height: 1;">${cat.name}</span>
-                        <br><span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">${cat.type === 'income' ? 'Ingreso/Flujo' : (cat.subtype === 'fixed' ? 'Necesidad (50%)' : 'Deseo (30%)')}</span>
+                        <br><span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Necesidad (50%)</span>
                     </div>
                 </div>
                 <div>
-                    <input type="number" class="zbb-cat-input" data-cat-id="${cat.id}" data-cat-name="${cat.name}" data-cat-type="${cat.type === 'income' ? 'income' : (cat.subtype === 'fixed' ? 'needs' : 'wants')}" placeholder="0.00" oninput="calculateZBBDelta()" inputmode="decimal" step="any">
+                    <input type="number" class="zbb-cat-input" data-cat-id="${cat.id}" data-cat-name="${cat.name}" data-cat-type="needs" placeholder="0.00" oninput="calculateZBBDelta()" inputmode="decimal" step="any">
+                </div>
+            </div>
+        `;
+    });
+
+    // 1b. Gastos: Deseos (30%)
+    const wants = allCategories.filter(c => c.subtype !== 'fixed');
+    wants.forEach(cat => {
+        html += `
+            <div class="zbb-cat-item">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div class="t-icon" style="background-color: ${cat.visual_color}; width: 40px; height: 40px; font-size: 1.1rem; border-radius: 4px; display: flex; justify-content: center; align-items: center; color: var(--bg-primary); border: 1px solid var(--text-primary);">
+                        <i class="fas ${cat.icon}"></i>
+                    </div>
+                    <div>
+                        <span style="font-family: var(--font-heading); font-size: 1.3rem; font-weight: 700; line-height: 1;">${cat.name}</span>
+                        <br><span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Deseo (30%)</span>
+                    </div>
+                </div>
+                <div>
+                    <input type="number" class="zbb-cat-input" data-cat-id="${cat.id}" data-cat-name="${cat.name}" data-cat-type="wants" placeholder="0.00" oninput="calculateZBBDelta()" inputmode="decimal" step="any">
+                </div>
+            </div>
+        `;
+    });
+    
+    // 2. Metas Económicas (Futuros)
+    allGoals.forEach(goal => {
+        html += `
+            <div class="zbb-cat-item">
+                <div style="display: flex; align-items: center; gap: 15px;">
+                    <div class="t-icon" style="background-color: #DDA629; width: 40px; height: 40px; font-size: 1.1rem; border-radius: 4px; display: flex; justify-content: center; align-items: center; color: var(--bg-primary); border: 1px solid var(--text-primary);">
+                        <i class="fas ${goal.icon || 'fa-bullseye'}"></i>
+                    </div>
+                    <div>
+                        <span style="font-family: var(--font-heading); font-size: 1.3rem; font-weight: 700; line-height: 1;">${goal.name}</span>
+                        <br><span style="font-size: 0.8rem; color: #DDA629; text-transform: uppercase; font-weight: 700;">FUTURO (20%)</span>
+                    </div>
+                </div>
+                <div>
+                    <input type="number" class="zbb-cat-input" data-cat-id="goal-${goal.id}" data-is-goal="true" data-cat-name="${goal.name}" data-cat-type="future" placeholder="0.00" oninput="calculateZBBDelta()" inputmode="decimal" step="any">
                 </div>
             </div>
         `;
@@ -1279,6 +1324,7 @@ window.syncZBBToBudgets = function() {
     let synced = 0;
 
     inputs.forEach(input => {
+        if(input.dataset.isGoal === "true") return; // Ignoramos las metas de Futuro para topes de categoría
         const catId = input.dataset.catId;
         const val = parseFloat(input.value) || 0;
         const cat = db.categories.find(c => String(c.id) === String(catId));
