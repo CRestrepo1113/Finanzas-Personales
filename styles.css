@@ -180,16 +180,16 @@ body {
 .zbb-huge-input { width: 100%; background: transparent; border: none; font-family: var(--font-heading); font-size: 3.5rem; font-weight: 700; color: var(--text-primary); outline: none; text-align: left; padding: 0; margin-top: 5px; }
 .zbb-huge-input::placeholder { color: rgba(43,43,43,0.15); }
 .zbb-floating-widget { position: fixed; bottom: 85px; left: 50%; transform: translateX(-50%); width: calc(100% - 40px); max-width: 560px; background: var(--bg-card); border: 2px solid var(--text-primary); border-radius: 8px 20px 6px 15px; padding: 15px 20px; box-shadow: 4px -4px 0px rgba(43,43,43,1); display: flex; justify-content: space-between; align-items: center; z-index: 90; transition: all 0.3s ease; }
-.zbb-delta-info { display: flex; flex-direction: column; }
-.zbb-delta-label { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: var(--text-primary); }
-.zbb-delta-value { font-family: var(--font-heading); font-size: 2rem; font-weight: 700; line-height: 1; }
+.zbb-delta-info { display: flex; flex-direction: column; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 10px; }
+.zbb-delta-label { font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: var(--text-primary); }
+.zbb-delta-value { font-family: var(--font-heading); font-size: clamp(1.4rem, 6vw, 2rem); font-weight: 700; line-height: 1; }
 .zbb-floating-widget.status-idle { border-color: #A37E00; background-color: #FCEFB4; box-shadow: 4px -4px 0px #A37E00; } 
 .zbb-floating-widget.status-idle .zbb-delta-value { color: #8C6A00; }
 .zbb-floating-widget.status-perfect { border-color: #005F3B; background-color: #D6F0E4; box-shadow: 4px -4px 0px #005F3B; }
 .zbb-floating-widget.status-perfect .zbb-delta-value { color: #005F3B; }
 .zbb-floating-widget.status-danger { border-color: #8C1F0A; background-color: #FBD5CD; box-shadow: 4px -4px 0px #8C1F0A; animation: shake 0.4s; }
 .zbb-floating-widget.status-danger .zbb-delta-value { color: #8C1F0A; }
-.zbb-save-btn { background: var(--text-primary); color: var(--bg-primary); padding: 12px 20px; border-radius: 12px 2px 10px 4px; font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; border: 2px solid var(--text-primary); cursor: pointer; transition: all 0.2s; }
+.zbb-save-btn { background: var(--text-primary); color: var(--bg-primary); padding: 8px 12px; border-radius: 12px 2px 10px 4px; font-family: var(--font-heading); font-size: 1.05rem; font-weight: 700; border: 2px solid var(--text-primary); cursor: pointer; transition: all 0.2s; display: inline-flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap; }
 .zbb-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .status-perfect .zbb-save-btn { background: #005F3B; border-color: #005F3B; animation: pulse 2s infinite; }
 #zbb-sync-budgets { background: var(--action-income); border-color: var(--action-income); }
