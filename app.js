@@ -31,6 +31,7 @@ db.goals.forEach(g => { if(g.is_emergency === undefined) g.is_emergency = false;
 
 let currentType = 'expense';
 let currentAnalyticsFilter = 'all';
+let showingAllTx = false;
 
 // DOM Elements
 const views = document.querySelectorAll('.view');
@@ -67,8 +68,14 @@ navItems.forEach(btn => {
         views.forEach(v => v.classList.remove('active'));
         document.getElementById(btn.dataset.target).classList.add('active');
         if(btn.dataset.target === 'view-analytics') renderAnalytics();
+        if(btn.dataset.target === 'view-settings') renderSettings();
     });
 });
+
+window.toggleShowAllTx = function() {
+    showingAllTx = !showingAllTx;
+    renderHome();
+};
 
 window.toggleAnalyticsFilter = function(type) {
     if(currentAnalyticsFilter === type) currentAnalyticsFilter = 'all';
@@ -93,8 +100,9 @@ window.toggleCategorySubtype = function() {
 // Transaction Helpers
 function renderTransactionHTML(tx) {
     if(tx.type === 'transfer') {
-        const fAcc = db.accounts.find(a => a.id === tx.from_account_id) || {name: '?'};
-        const tAcc = db.accounts.find(a => a.id === tx.to_account_id) || {name: '?'};
+        const fAcc = db.accounts.find(a => a.id === tx.from_account_id) || {name: '?', currency: 'USD'};
+        const tAcc = db.accounts.find(a => a.id === tx.to_account_id) || {name: '?', currency: 'USD'};
+        const currSymbol = {USD:'$',EUR:'€',COP:'$',RUB:'₽'}[fAcc.currency] || '$';
         return `
         <div class="transaction-item" onclick="openEditDispatcher('${tx.id}')" style="cursor: pointer;">
             <div class="t-left">
@@ -104,7 +112,7 @@ function renderTransactionHTML(tx) {
                     <span class="t-date">${new Date(tx.date).toLocaleDateString()} &bull; ${fAcc.name} ➔ ${tAcc.name}</span>
                 </div>
             </div>
-            <div class="t-amount" style="color: var(--text-secondary)">$${(tx.amount_extracted||0).toFixed(2)}</div>
+            <div class="t-amount" style="color: var(--text-secondary)">${currSymbol}${(tx.amount_extracted||0).toFixed(2)} ${fAcc.currency}</div>
         </div>`;
     } else {
         const cat = db.categories.find(c => c.id === tx.category_id) || {name: 'Borrada', type: 'expense', visual_color: '#000', icon: 'fa-ghost'};
@@ -128,6 +136,7 @@ function renderTransactionHTML(tx) {
 // Universal Edit Dispatcher
 window.openEditDispatcher = function(id) {
     const tx = db.transactions.find(t => t.id === id);
+    if(!tx) return; // Guard: transacción no encontrada
     if(tx.type === 'transfer') openTransferModal(tx.id);
     else {
         const cat = db.categories.find(c => c.id === tx.category_id) || {type: 'expense'};
@@ -156,6 +165,8 @@ window.openModal = function(type, txId = null) {
     } else {
         document.getElementById('tx-edit-id').value = "";
         document.getElementById('date').value = new Date().toISOString().split('T')[0];
+        document.getElementById('amount').value = "";
+        document.getElementById('notes').value = "";
         document.getElementById('tx-save-btn').textContent = "Registrar Transacción";
         document.getElementById('tx-delete-btn').classList.add('hidden');
     }
@@ -169,12 +180,19 @@ txForm.addEventListener('submit', (e) => {
     const amount = parseFloat(document.getElementById('amount').value);
     const accId = parseInt(accSelect.value);
     const catId = parseInt(catSelect.value);
-    const dateVal = document.getElementById('date').value + "T12:00:00.000Z";
+    const dateVal = document.getElementById('date').value + "T00:00:00"; // Hora local, sin desfase UTC
+
+    // Validar monto positivo
+    if(!amount || amount <= 0) return alert('El monto debe ser un número positivo mayor a cero.');
+
+    // Derivar tipo de la categoría seleccionada, no de la variable global
+    const selectedCat = db.categories.find(c => c.id === catId) || {type: currentType};
+    const txType = selectedCat.type; // 'income' o 'expense'
 
     if (editId) {
         const oldTx = db.transactions.find(t => t.id === editId);
         const oldAcc = db.accounts.find(a => a.id === oldTx.account_id);
-        const oldCat = db.categories.find(c => c.id === oldTx.category_id) || {type: currentType};
+        const oldCat = db.categories.find(c => c.id === oldTx.category_id) || {type: 'expense'};
         if(oldCat.type === 'expense') oldAcc.balance += oldTx.amount; else oldAcc.balance -= oldTx.amount;
         
         oldTx.amount = amount; oldTx.account_id = accId; oldTx.category_id = catId; 
@@ -187,7 +205,7 @@ txForm.addEventListener('submit', (e) => {
     }
 
     const acc = db.accounts.find(a => a.id === accId);
-    if(currentType === 'expense') acc.balance -= amount; else acc.balance += amount;
+    if(txType === 'expense') acc.balance -= amount; else acc.balance += amount;
     
     saveDB(); txModal.classList.add('hidden'); txForm.reset(); renderHome(); if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
 });
@@ -244,9 +262,10 @@ transferForm.addEventListener('submit', (e) => {
     const toId = parseInt(targetTo.value);
     const amountExtracted = parseFloat(document.getElementById('trans-amount').value);
     const amountReceived = parseFloat(document.getElementById('trans-received').value);
-    const dateVal = document.getElementById('trans-date').value + "T12:00:00.000Z";
+    const dateVal = document.getElementById('trans-date').value + "T00:00:00"; // Hora local, sin desfase UTC
 
     if(fromId === toId) return alert("Operación inválida: La cuenta de origen no puede ser la misma que la de destino.");
+    if(!amountExtracted || amountExtracted <= 0 || !amountReceived || amountReceived <= 0) return alert('Los montos deben ser números positivos mayores a cero.');
     const fromAcc = db.accounts.find(a => a.id === fromId);
     const toAcc = db.accounts.find(a => a.id === toId);
 
@@ -294,7 +313,7 @@ window.deleteCurrentTransfer = function() {
 // Modals Settings: Cuentas y Categorías
 window.openAccountModal = (id = null) => {
     if (id) {
-        const a = db.accounts.find(acc => acc.id === id);
+        const a = db.accounts.find(acc => String(acc.id) === String(id));
         document.getElementById('acc-edit-id').value = a.id;
         document.getElementById('acc-name').value = a.name;
         document.getElementById('acc-currency').value = a.currency;
@@ -333,7 +352,7 @@ accForm.addEventListener('submit', (e) => {
     const color = document.getElementById('acc-color').value;
 
     if (editId) {
-        const a = db.accounts.find(x => x.id === parseInt(editId));
+        const a = db.accounts.find(x => String(x.id) === String(editId));
         a.name = name; a.currency = currency; a.type = type; a.color = color;
     } else {
         let finalBalance = parseFloat(document.getElementById('acc-balance').value);
@@ -341,7 +360,7 @@ accForm.addEventListener('submit', (e) => {
         if(type === 'asset' && finalBalance < 0) finalBalance = Math.abs(finalBalance);
 
         db.accounts.push({
-            id: Date.now(), name: name, currency: currency, balance: finalBalance, type: type, color: color
+            id: crypto.randomUUID(), name: name, currency: currency, balance: finalBalance, type: type, color: color
         });
     }
     saveDB(); closeAccountModal(); renderHome(); renderSettings();
@@ -352,7 +371,7 @@ window.deleteCurrentAccount = function() {
     if(!editId) return;
     if(db.accounts.length <= 1) return alert("Acción denegada: No puedes destruir tu última cuenta estructurada.");
     if(confirm("¿Eliminar cuenta permanentemente? Sus transacciones formarán agujeros contables.")) {
-        db.accounts = db.accounts.filter(a => a.id !== parseInt(editId)); 
+        db.accounts = db.accounts.filter(a => String(a.id) !== String(editId)); 
         saveDB(); closeAccountModal(); renderHome(); renderSettings(); 
     }
 }
@@ -371,8 +390,8 @@ window.moveAccountOrder = function(index, direction) {
 }
 
 window.openCategoryModal = (catId = null) => {
-    if (catId && typeof catId === 'number') {
-        const c = db.categories.find(x => x.id === catId);
+    if (catId) {
+        const c = db.categories.find(x => String(x.id) === String(catId));
         document.getElementById('cat-edit-id').value = c.id;
         document.getElementById('cat-name').value = c.name;
         document.getElementById('cat-type').value = c.type;
@@ -417,11 +436,11 @@ catForm.addEventListener('submit', (e) => {
     const icon = document.getElementById('cat-icon').value;
 
     if (editId) {
-        const c = db.categories.find(x => x.id === parseInt(editId));
+        const c = db.categories.find(x => String(x.id) === String(editId));
         c.name = name; c.type = type; c.budget = budget; c.visual_color = visual_color; c.icon = icon; c.subtype = subtype;
     } else {
         db.categories.push({
-            id: Date.now(), name, type, subtype, budget, visual_color, icon
+            id: crypto.randomUUID(), name, type, subtype, budget, visual_color, icon
         });
     }
     saveDB(); closeCategoryModal(); renderSettings();
@@ -433,7 +452,7 @@ window.deleteCurrentCategory = function() {
     if(!editId) return;
     if(db.categories.length <= 1) return alert("Acción denegada: El sistema requiere al menos una categoría vital.");
     if(confirm("¿Deseas eliminar permanentemente esta categoría estructural?")) { 
-        db.categories = db.categories.filter(c => c.id !== parseInt(editId)); 
+        db.categories = db.categories.filter(c => String(c.id) !== String(editId)); 
         saveDB(); closeCategoryModal(); renderSettings(); 
         if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
     }
@@ -445,8 +464,8 @@ window.openGoalModal = (goalId = null) => {
     goalAccSelect.innerHTML = '<option value="">-- Sin Vincular (Aporte Manual) --</option>' + 
                               db.accounts.map(a => `<option value="${a.id}">${a.name} (${a.currency})</option>`).join('');
 
-    if (goalId && typeof goalId === 'number') {
-        const g = db.goals.find(x => x.id === goalId);
+    if (goalId) {
+        const g = db.goals.find(x => String(x.id) === String(goalId));
         document.getElementById('goal-edit-id').value = g.id;
         document.getElementById('goal-name').value = g.name;
         document.getElementById('goal-target').value = g.target;
@@ -488,10 +507,10 @@ goalForm.addEventListener('submit', (e) => {
     const isEmergency = isEmergencyElem ? isEmergencyElem.checked : false;
 
     if (editId) {
-        const g = db.goals.find(x => x.id === parseInt(editId));
+        const g = db.goals.find(x => String(x.id) === String(editId));
         g.name = name; g.target = target; g.icon = icon; g.account_id = accId; g.is_emergency = isEmergency;
     } else {
-        db.goals.push({ id: Date.now(), name, target, current: 0, icon, account_id: accId, is_emergency: isEmergency });
+        db.goals.push({ id: crypto.randomUUID(), name, target, current: 0, icon, account_id: accId, is_emergency: isEmergency });
     }
     saveDB(); closeGoalModal(); renderHome(); renderSettings();
 });
@@ -500,13 +519,13 @@ window.deleteCurrentGoal = function() {
     const editId = document.getElementById('goal-edit-id').value;
     if(!editId) return;
     if(confirm("¿Abandonar este objetivo económico (Borrar Meta)?")) {
-        db.goals = db.goals.filter(g => g.id !== parseInt(editId));
+        db.goals = db.goals.filter(g => String(g.id) !== String(editId));
         saveDB(); closeGoalModal(); renderHome(); renderSettings();
     }
 }
 
 window.openFundGoalModal = (id) => {
-    const goal = db.goals.find(g => g.id === id);
+    const goal = db.goals.find(g => String(g.id) === String(id));
     if(!goal) return;
     document.getElementById('fund-goal-id').value = id;
     document.getElementById('modal-fund-title').textContent = `Aportar a: ${goal.name}`;
@@ -515,20 +534,25 @@ window.openFundGoalModal = (id) => {
 window.closeFundGoalModal = () => { fundGoalModal.classList.add('hidden'); fundGoalForm.reset(); };
 fundGoalForm.addEventListener('submit', (e) => {
     e.preventDefault();
-    const id = parseInt(document.getElementById('fund-goal-id').value);
+    const id = document.getElementById('fund-goal-id').value;
     const amt = parseFloat(document.getElementById('fund-amount').value);
-    const goal = db.goals.find(g => g.id === id);
+    const goal = db.goals.find(g => String(g.id) === String(id));
     if(goal && !goal.account_id) { goal.current += amt; }
     saveDB(); closeFundGoalModal(); renderHome(); renderSettings();
 });
 
 window.deleteGoal = function(id) {
-    if(confirm("¿Renunciar a este objetivo?")) { db.goals = db.goals.filter(g => g.id !== id); saveDB(); renderHome(); renderSettings(); }
+    if(confirm("¿Renunciar a este objetivo?")) { db.goals = db.goals.filter(g => String(g.id) !== String(id)); saveDB(); renderHome(); renderSettings(); }
 }
 
 function saveDB() { 
     db.transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
-    localStorage.setItem('finance_db_v3', JSON.stringify(db)); 
+    try {
+        localStorage.setItem('finance_db_v3', JSON.stringify(db));
+    } catch(e) {
+        alert('⚠️ Error al guardar: El almacenamiento del navegador está lleno. Exporta tu backup CSV antes de continuar.');
+        console.error('localStorage full:', e);
+    }
 }
 
 
@@ -565,25 +589,31 @@ function renderHome() {
         <div class="account-card" style="background-color: ${cardColor}; border-color: ${cardColor};">
             <i class="fas fa-asterisk ac-bg-lines"></i>
             <span class="ac-currency">${acc.currency}</span>
-            <h2 class="ac-balance" style="${balanceColor}">${acc.balance.toLocaleString('es-ES', {style:'currency', currency: acc.currency})}</h2>
+            <h2 class="ac-balance" style="${balanceColor}">${acc.balance.toLocaleString('es-ES', {minimumFractionDigits: 2, maximumFractionDigits: 2})} ${acc.currency}</h2>
             <p class="ac-name">${acc.name}</p>
         </div>
     `}).join('');
 
-    const recents = db.transactions.slice(0, 10);
-    if(recents.length === 0) { transactionsList.innerHTML = '<div class="empty-state">No hay fluidez en el estado. Registra transacciones del sistema.</div>'; } 
-    else { transactionsList.innerHTML = recents.map(tx => renderTransactionHTML(tx)).join(''); }
+    const txToShow = showingAllTx ? db.transactions : db.transactions.slice(0, 10);
+    if(txToShow.length === 0) { transactionsList.innerHTML = '<div class="empty-state">No hay transacciones registradas. Registra movimientos para comenzar.</div>'; } 
+    else { transactionsList.innerHTML = txToShow.map(tx => renderTransactionHTML(tx)).join(''); }
+    // Actualizar texto de "Ver todo"
+    const seeAllBtn = document.querySelector('.see-all');
+    if(seeAllBtn) {
+        seeAllBtn.textContent = showingAllTx ? 'Ver recientes' : `Ver todo (${db.transactions.length})`;
+        if(db.transactions.length <= 10) seeAllBtn.style.display = 'none'; else seeAllBtn.style.display = '';
+    }
 
     if(db.goals.length === 0) { savingsList.innerHTML = '<div class="empty-state">No hay vectores de inversión ni fondos trazados.</div>'; }
     else {
         savingsList.innerHTML = db.goals.map(g => {
             const currentAmount = g.account_id ? (db.accounts.find(a => a.id === g.account_id)?.balance || 0) : (g.current || 0);
             const percent = Math.min(100, Math.round((currentAmount / g.target) * 100)) || 0;
-            const actionOnClick = g.account_id ? `openTransferModal(null, ${g.account_id})` : `openFundGoalModal(${g.id})`;
+            const actionOnClick = g.account_id ? `openTransferModal(null, '${g.account_id}')` : `openFundGoalModal('${g.id}')`;
             const actionIcon = g.account_id ? "fa-exchange-alt" : "fa-arrow-up";
             
             return `
-            <div class="saving-card" onclick="openGoalModal(${g.id})">
+            <div class="saving-card" onclick="openGoalModal('${g.id}')">
                 <div class="saving-header">
                     <div class="t-left">
                         <div class="t-icon" style="background-color: #2B2B2B"><i class="fas ${g.icon}"></i></div>
@@ -606,7 +636,8 @@ function renderHome() {
             </div>
         `}).join('');
     }
-    renderSettings();
+    // Solo renderizar Settings si la vista está activa (optimización de rendimiento)
+    if(document.getElementById('view-settings')?.classList.contains('active')) renderSettings();
 }
 
 window.renderAnalytics = function() {
@@ -833,7 +864,7 @@ function renderSettings() {
         const cardColor = a.color || 'var(--accent-gold)';
         return `
         <div class="setting-row">
-            <span onclick="openAccountModal(${a.id})" style="cursor: pointer; display: flex; align-items: center; gap: 10px; flex: 1;">
+            <span onclick="openAccountModal('${a.id}')" style="cursor: pointer; display: flex; align-items: center; gap: 10px; flex: 1;">
                 <span style="display:inline-block; width: 14px; height: 14px; border-radius: 50%; background-color: ${cardColor}; border: 1px solid var(--text-primary);"></span>
                 <span><strong>${a.name}</strong> (${a.currency})</span>
             </span>
@@ -863,14 +894,14 @@ function renderSettings() {
     
     const renderCategoryRow = (c) => `
         <div class="setting-row">
-            <span onclick="openCategoryModal(${c.id})" style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+            <span onclick="openCategoryModal('${c.id}')" style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
                 <i class="fas ${c.icon}" style="color:${c.visual_color}; width:20px;"></i>
                 <span>
                     <strong>${c.name}</strong>
                     ${c.budget > 0 ? `<br><small style="color:var(--text-secondary)">Límite: $${c.budget}</small>` : ''}
                 </span>
             </span>
-            <i class="fas fa-trash trash-btn" onclick="openCategoryModal(${c.id})"></i>
+            <i class="fas fa-trash trash-btn" onclick="openCategoryModal('${c.id}')"></i>
         </div>
     `;
 
@@ -893,8 +924,8 @@ function renderSettings() {
             const currentAmount = g.account_id ? (db.accounts.find(a => a.id === g.account_id)?.balance || 0) : (g.current || 0);
             return `
             <div class="setting-row">
-                <span onclick="openGoalModal(${g.id})" style="cursor: pointer;"><i class="fas ${g.icon}" style="width:20px;"></i> <strong>${g.name}</strong> ($${currentAmount.toFixed(0)} / $${g.target.toFixed(0)})</span>
-                <i class="fas fa-trash trash-btn" onclick="deleteGoal(${g.id})"></i>
+                <span onclick="openGoalModal('${g.id}')" style="cursor: pointer;"><i class="fas ${g.icon}" style="width:20px;"></i> <strong>${g.name}</strong> ($${currentAmount.toFixed(0)} / $${g.target.toFixed(0)})</span>
+                <i class="fas fa-trash trash-btn" onclick="deleteGoal('${g.id}')"></i>
             </div>
         `}).join('');
     }
@@ -912,11 +943,13 @@ document.querySelectorAll('.icon-selector i').forEach(icon => {
 });
 
 // Exportación
-// El modo oscuro fue removido a petición del usuario. Limpiar estado cacheado.
+// Limpieza de legado: remover referencias al tema oscuro eliminado
 document.documentElement.removeAttribute('data-theme');
-localStorage.setItem('schiele_theme', 'light');
+localStorage.removeItem('schiele_theme');
 
 window.exportToCSV = function() {
+    if(!confirm('¿Exportar una copia de seguridad completa de todos tus datos financieros?')) return;
+
     let csvContent = "";
     
     // settings
@@ -930,17 +963,17 @@ window.exportToCSV = function() {
     });
     csvContent += "\n";
 
-    // categories
-    csvContent += "### BLOQUE_CATEGORIAS ###\nid,name,type,budget,visual_color,icon\n";
+    // categories (now includes subtype)
+    csvContent += "### BLOQUE_CATEGORIAS ###\nid,name,type,budget,visual_color,icon,subtype\n";
     db.categories.forEach(c => {
-        csvContent += `${c.id},"${c.name}",${c.type},${c.budget},${c.visual_color},${c.icon}\n`;
+        csvContent += `${c.id},"${c.name}",${c.type},${c.budget},${c.visual_color},${c.icon},${c.subtype || 'variable'}\n`;
     });
     csvContent += "\n";
 
-    // goals
-    csvContent += "### BLOQUE_METAS ###\nid,name,target,current,icon,account_id\n";
+    // goals (now includes is_emergency)
+    csvContent += "### BLOQUE_METAS ###\nid,name,target,current,icon,account_id,is_emergency\n";
     db.goals.forEach(g => {
-        csvContent += `${g.id},"${g.name}",${g.target},${g.current},${g.icon},${g.account_id || ''}\n`;
+        csvContent += `${g.id},"${g.name}",${g.target},${g.current},${g.icon},${g.account_id || ''},${g.is_emergency ? 'true' : 'false'}\n`;
     });
     csvContent += "\n";
 
@@ -992,16 +1025,26 @@ window.importFromCSV = function(event) {
         
         const parseCSVLine = (str) => {
             const arr = [];
-            let quote = false;  
+            let inQuote = false;
             let val = "";
-            for (let c of str) {
-                if(c === '"' && quote === false) { quote = true; }
-                else if(c === '"' && quote === true) { quote = false; }
-                else if(c === ',' && quote === false) { arr.push(val); val = ""; }
-                else { val += c; }
+            for (let i = 0; i < str.length; i++) {
+                const c = str[i];
+                if(c === '"') {
+                    if(inQuote && str[i+1] === '"') {
+                        val += '"'; // Comilla escapada ("" → ")
+                        i++; // Saltar la siguiente comilla
+                    } else {
+                        inQuote = !inQuote;
+                    }
+                } else if(c === ',' && !inQuote) {
+                    arr.push(val);
+                    val = "";
+                } else {
+                    val += c;
+                }
             }
             arr.push(val);
-            return arr.map(s => s.replace(/""/g, '"'));
+            return arr;
         };
 
         for(let i = 0; i < lines.length; i++) {
@@ -1024,8 +1067,9 @@ window.importFromCSV = function(event) {
             }
             else if(mode === '### BLOQUE_CUENTAS ###') {
                 if(cols.length >= 6) {
+                    const accId = isNaN(Number(cols[0])) ? cols[0] : Number(cols[0]);
                     newDB.accounts.push({
-                        id: Number(cols[0]),
+                        id: accId,
                         name: cols[1],
                         currency: cols[2],
                         balance: parseFloat(cols[3]) || 0,
@@ -1036,30 +1080,35 @@ window.importFromCSV = function(event) {
             }
             else if(mode === '### BLOQUE_CATEGORIAS ###') {
                 if(cols.length >= 6) {
+                    const catId = isNaN(Number(cols[0])) ? cols[0] : Number(cols[0]);
                     newDB.categories.push({
-                        id: Number(cols[0]),
+                        id: catId,
                         name: cols[1],
                         type: cols[2],
                         budget: parseFloat(cols[3]) || 0,
                         visual_color: cols[4],
-                        icon: cols[5]
+                        icon: cols[5],
+                        subtype: cols[6] || 'variable' // Soporte para nuevo campo subtype
                     });
                 }
             }
             else if(mode === '### BLOQUE_METAS ###') {
                 if(cols.length >= 6) {
+                    const goalId = isNaN(Number(cols[0])) ? cols[0] : Number(cols[0]);
                     newDB.goals.push({
-                        id: Number(cols[0]),
+                        id: goalId,
                         name: cols[1],
                         target: parseFloat(cols[2]) || 0,
                         current: parseFloat(cols[3]) || 0,
                         icon: cols[4],
-                        account_id: cols[5] ? Number(cols[5]) : null
+                        account_id: cols[5] ? (isNaN(Number(cols[5])) ? cols[5] : Number(cols[5])) : null,
+                        is_emergency: cols[6] === 'true' // Soporte para nuevo campo is_emergency
                     });
                 }
             }
             else if(mode === '### BLOQUE_TRANSACCIONES ###') {
                 if(cols.length >= 11) { 
+                    const parseId = (v) => v ? (isNaN(Number(v)) ? v : Number(v)) : null;
                     newDB.transactions.push({
                         id: cols[0],
                         type: cols[1],
@@ -1067,10 +1116,10 @@ window.importFromCSV = function(event) {
                         amount: parseFloat(cols[3]) || 0,
                         amount_extracted: parseFloat(cols[4]) || 0,
                         amount_received: parseFloat(cols[5]) || 0,
-                        from_account_id: cols[6] ? Number(cols[6]) : null,
-                        to_account_id: cols[7] ? Number(cols[7]) : null,
-                        category_id: cols[8] ? Number(cols[8]) : null,
-                        account_id: cols[9] ? Number(cols[9]) : null,
+                        from_account_id: parseId(cols[6]),
+                        to_account_id: parseId(cols[7]),
+                        category_id: parseId(cols[8]),
+                        account_id: parseId(cols[9]),
                         notes: cols[10]
                     });
                 }
@@ -1166,12 +1215,15 @@ window.calculateZBBDelta = function() {
     
     let totalAssigned = 0;
     let allocations = [];
+    let hasAnyAllocation = false;
     
     inputs.forEach(input => {
         const val = parseFloat(input.value) || 0;
         if(val > 0) {
             totalAssigned += val;
+            hasAnyAllocation = true;
             allocations.push({
+                category_id: input.dataset.catId,
                 category_name: input.dataset.catName,
                 amount: val,
                 category_type: input.dataset.catType
@@ -1183,12 +1235,16 @@ window.calculateZBBDelta = function() {
     const floatWidget = document.getElementById('zbb-floating-delta');
     const deltaValLabel = document.getElementById('zbb-delta-val');
     const saveBtn = document.getElementById('zbb-save-plan');
+    const syncBtn = document.getElementById('zbb-sync-budgets');
     
     deltaValLabel.textContent = `$${delta.toFixed(2)}`;
     
     // Cleanup classes
     floatWidget.classList.remove('status-idle', 'status-perfect', 'status-danger');
     
+    // Sync button: habilitado si hay al menos una asignación
+    if(syncBtn) syncBtn.disabled = !hasAnyAllocation;
+
     let currentStatus = 'Capital Ocioso';
     if(delta === 0 && income > 0) {
         floatWidget.classList.add('status-perfect');
@@ -1218,6 +1274,41 @@ window.calculateZBBDelta = function() {
     };
 }
 
+window.syncZBBToBudgets = function() {
+    const inputs = document.querySelectorAll('.zbb-cat-input');
+    let synced = 0;
+
+    inputs.forEach(input => {
+        const catId = input.dataset.catId;
+        const val = parseFloat(input.value) || 0;
+        const cat = db.categories.find(c => String(c.id) === String(catId));
+        if(cat && val > 0) {
+            cat.budget = val;
+            synced++;
+        }
+    });
+
+    if(synced === 0) {
+        alert('No hay asignaciones para sincronizar. Ingresa montos en las categorías primero.');
+        return;
+    }
+
+    // Feedback visual PRIMERO (antes de operaciones pesadas)
+    const btn = document.getElementById('zbb-sync-budgets');
+    if(btn) {
+        const originalHTML = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i> Listo';
+        btn.classList.add('zbb-confirmed');
+        setTimeout(() => { btn.innerHTML = originalHTML; btn.classList.remove('zbb-confirmed'); }, 1500);
+    }
+
+    // Persistir y renderizar de forma diferida para no bloquear el paint del feedback
+    requestAnimationFrame(() => {
+        saveDB();
+        renderSettings();
+    });
+}
+
 window.saveZBBPlan = function() {
     if(!currentZBBPlan || currentZBBPlan.metrics.delta !== 0) return;
     
@@ -1228,8 +1319,15 @@ window.saveZBBPlan = function() {
     zbbHistory = zbbHistory.filter(p => p.month_id !== currentZBBPlan.month_id);
     zbbHistory.push(currentZBBPlan);
     localStorage.setItem('finance_zbb_history', JSON.stringify(zbbHistory));
-    
-    alert(`¡Maestría financiera lograda! Tu plan Base Cero para ${currentZBBPlan.month_id} ha sido almacenado exitosamente.`);
+
+    // Feedback visual: flash en el botón
+    const btn = document.getElementById('zbb-save-plan');
+    if(btn) {
+        const originalText = btn.textContent;
+        btn.textContent = '✓ Guardado';
+        btn.classList.add('zbb-confirmed');
+        setTimeout(() => { btn.textContent = originalText; btn.classList.remove('zbb-confirmed'); }, 1500);
+    }
 }
 
 window.exportZBBPlan = function() {

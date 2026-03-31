@@ -10,15 +10,7 @@
     --font-body: 'Inconsolata', monospace;
 }
 
-[data-theme="dark"] {
-    --bg-primary: #1F1B16;
-    --bg-card: #2E2720;
-    --text-primary: #DED3C1;
-    --text-secondary: #9C8F79;
-    --action-income: #409C91;
-    --action-expense: #E56247;
-    --accent-gold: #C08A1B;
-}
+/* Dark theme removido — se mantiene solo el tema claro */
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body {
@@ -159,6 +151,7 @@ body {
 .nav-item.active::after { content: ''; position: absolute; bottom: -5px; left: 20%; width: 60%; height: 4px; background: var(--action-expense); border-radius: 2px 5px 1px 4px; }
 
 /* Modal tweaks */
+.hidden:not(.view) { display: none; }
 .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(43, 43, 43, 0.85); display: flex; justify-content: center; align-items: center; z-index: 1000; padding: 20px; backdrop-filter: blur(4px); }
 .modal.hidden { display: none; }
 .modal-content { background-color: var(--bg-card); width: 100%; max-width: 400px; border: 2px solid var(--text-primary); border-radius: 5px 12px 2px 15px; box-shadow: 8px 8px 0px 0px var(--bg-primary); padding: 25px; animation: fadeInUp 0.3s ease; }
@@ -199,6 +192,8 @@ body {
 .zbb-save-btn { background: var(--text-primary); color: var(--bg-primary); padding: 12px 20px; border-radius: 12px 2px 10px 4px; font-family: var(--font-heading); font-size: 1.2rem; font-weight: 700; border: 2px solid var(--text-primary); cursor: pointer; transition: all 0.2s; }
 .zbb-save-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 .status-perfect .zbb-save-btn { background: #005F3B; border-color: #005F3B; animation: pulse 2s infinite; }
+#zbb-sync-budgets { background: var(--action-income); border-color: var(--action-income); }
+.zbb-save-btn.zbb-confirmed { background: var(--accent-gold) !important; background-color: var(--accent-gold) !important; border-color: var(--accent-gold) !important; color: var(--text-primary) !important; animation: none !important; transform: scale(1.08); }
 .zbb-cat-item { display: flex; align-items: center; justify-content: space-between; padding: 15px 0; border-bottom: 2px dotted rgba(43,43,43,0.2); }
 .zbb-cat-input { width: 120px; padding: 8px 12px; font-family: var(--font-body); font-weight: 700; text-align: right; border: 2px solid var(--text-primary); border-radius: 4px 8px 2px 4px; background: var(--bg-primary); color: var(--text-primary); outline: none; font-size: 1.1rem; }
 .zbb-cat-input:focus { box-shadow: 3px 3px 0px var(--text-primary); }

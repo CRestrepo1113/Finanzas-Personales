@@ -6,14 +6,22 @@
     <meta name="theme-color" content="#F4ECD8">
     <title>Finanzas Personales</title>
     <link rel="manifest" href="manifest.json">
-    <link rel="stylesheet" href="styles.css?v=2.4">
+    <link rel="stylesheet" href="styles.css?v=3.2">
     
     <!-- Google Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inconsolata:wght@200..900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-</head>
+    
+    <!-- Service Worker Registration -->
+    <script>
+        if('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js').catch(err => console.warn('SW registration failed:', err));
+            });
+        }
+    </script></head>
 <body>
     <div id="app">
         <!-- HEADER TOP -->
@@ -80,7 +88,7 @@
                 <section class="section-block">
                     <div class="section-header">
                         <h3>Historial de Movimientos</h3>
-                        <span class="see-all">Ver todo</span>
+                        <span class="see-all" onclick="toggleShowAllTx()">Ver todo</span>
                     </div>
                     <div id="transactions-list" class="transactions-list">
                         <!-- JS inyectado -->
@@ -222,7 +230,10 @@
                         <span class="zbb-delta-label">Remanente ($\Delta$)</span>
                         <span class="zbb-delta-value" id="zbb-delta-val">$0.00</span>
                     </div>
-                    <button class="btn zbb-save-btn" id="zbb-save-plan" onclick="saveZBBPlan()">Guardar</button>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn zbb-save-btn" id="zbb-sync-budgets" onclick="syncZBBToBudgets()" title="Copiar asignaciones ZBB a los topes de cada categoría" style="font-size: 0.85rem; padding: 10px 14px;"><i class="fas fa-sync-alt"></i> Topes</button>
+                        <button class="btn zbb-save-btn" id="zbb-save-plan" onclick="saveZBBPlan()">Guardar</button>
+                    </div>
                 </div>
             </section>
 
@@ -461,6 +472,6 @@
 
     </div>
     
-    <script src="app.js?v=2.4"></script>
+    <script src="app.js?v=3.2"></script>
 </body>
 </html>
