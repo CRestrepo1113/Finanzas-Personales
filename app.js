@@ -178,22 +178,24 @@ txForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const editId = document.getElementById('tx-edit-id').value;
     const amount = parseFloat(document.getElementById('amount').value);
-    const accId = /^\\d+$/.test(accSelect.value) ? parseInt(accSelect.value) : accSelect.value;
-    const catId = /^\\d+$/.test(catSelect.value) ? parseInt(catSelect.value) : catSelect.value;
+    const accId = accSelect.value;
+    const catId = catSelect.value;
     const dateVal = document.getElementById('date').value + "T00:00:00"; // Hora local, sin desfase UTC
 
     // Validar monto positivo
     if(!amount || amount <= 0) return alert('El monto debe ser un número positivo mayor a cero.');
 
     // Derivar tipo de la categoría seleccionada, no de la variable global
-    const selectedCat = db.categories.find(c => c.id === catId) || {type: currentType};
+    const selectedCat = db.categories.find(c => String(c.id) === String(catId)) || {type: currentType};
     const txType = selectedCat.type; // 'income' o 'expense'
 
     if (editId) {
-        const oldTx = db.transactions.find(t => t.id === editId);
-        const oldAcc = db.accounts.find(a => a.id === oldTx.account_id);
-        const oldCat = db.categories.find(c => c.id === oldTx.category_id) || {type: 'expense'};
-        if(oldCat.type === 'expense') oldAcc.balance += oldTx.amount; else oldAcc.balance -= oldTx.amount;
+        const oldTx = db.transactions.find(t => String(t.id) === String(editId));
+        const oldAcc = db.accounts.find(a => String(a.id) === String(oldTx.account_id));
+        const oldCat = db.categories.find(c => String(c.id) === String(oldTx.category_id)) || {type: 'expense'};
+        if (oldAcc) {
+            if(oldCat.type === 'expense') oldAcc.balance += oldTx.amount; else oldAcc.balance -= oldTx.amount;
+        }
         
         oldTx.amount = amount; oldTx.account_id = accId; oldTx.category_id = catId; 
         oldTx.date = dateVal; oldTx.notes = document.getElementById('notes').value;
@@ -204,8 +206,10 @@ txForm.addEventListener('submit', (e) => {
         });
     }
 
-    const acc = db.accounts.find(a => a.id === accId);
-    if(txType === 'expense') acc.balance -= amount; else acc.balance += amount;
+    const acc = db.accounts.find(a => String(a.id) === String(accId));
+    if (acc) {
+        if(txType === 'expense') acc.balance -= amount; else acc.balance += amount;
+    }
     
     saveDB(); txModal.classList.add('hidden'); txForm.reset(); renderHome(); if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
 });
@@ -214,14 +218,18 @@ window.deleteCurrentTx = function() {
     const editId = document.getElementById('tx-edit-id').value;
     if(!editId) return;
     if(confirm("¿Estás seguro de eliminar esta transacción?")) {
-        const oldTx = db.transactions.find(t => t.id === editId);
-        const oldAcc = db.accounts.find(a => a.id === oldTx.account_id);
-        const oldCat = db.categories.find(c => c.id === oldTx.category_id) || {type: 'expense'};
-        
-        if(oldCat.type === 'expense') oldAcc.balance += oldTx.amount; 
-        else oldAcc.balance -= oldTx.amount;
+        const oldTx = db.transactions.find(t => String(t.id) === String(editId));
+        if (oldTx) {
+            const oldAcc = db.accounts.find(a => String(a.id) === String(oldTx.account_id));
+            const oldCat = db.categories.find(c => String(c.id) === String(oldTx.category_id)) || {type: 'expense'};
+            
+            if (oldAcc) {
+                if(oldCat.type === 'expense') oldAcc.balance += oldTx.amount; 
+                else oldAcc.balance -= oldTx.amount;
+            }
+        }
 
-        db.transactions = db.transactions.filter(t => t.id !== editId);
+        db.transactions = db.transactions.filter(t => String(t.id) !== String(editId));
         saveDB(); txModal.classList.add('hidden'); txForm.reset(); renderHome(); if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
     }
 }
@@ -260,8 +268,8 @@ window.closeTransferModal = () => { transferModal.classList.add('hidden'); trans
 transferForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const editId = document.getElementById('trans-edit-id').value;
-    const fromId = /^\\d+$/.test(targetFrom.value) ? parseInt(targetFrom.value) : targetFrom.value;
-    const toId = /^\\d+$/.test(targetTo.value) ? parseInt(targetTo.value) : targetTo.value;
+    const fromId = targetFrom.value;
+    const toId = targetTo.value;
     const amountExtracted = parseFloat(document.getElementById('trans-amount').value);
     const amountReceived = parseFloat(document.getElementById('trans-received').value);
     const commentVal = document.getElementById('trans-comment').value.trim();
@@ -269,21 +277,24 @@ transferForm.addEventListener('submit', (e) => {
 
     if(fromId === toId) return alert("Operación inválida: La cuenta de origen no puede ser la misma que la de destino.");
     if(!amountExtracted || amountExtracted <= 0 || !amountReceived || amountReceived <= 0) return alert('Los montos deben ser números positivos mayores a cero.');
-    const fromAcc = db.accounts.find(a => a.id === fromId);
-    const toAcc = db.accounts.find(a => a.id === toId);
+    
+    const fromAcc = db.accounts.find(a => String(a.id) === String(fromId));
+    const toAcc = db.accounts.find(a => String(a.id) === String(toId));
 
     if (editId) {
-        const oldTx = db.transactions.find(t => t.id === editId);
-        const oldFrom = db.accounts.find(a => a.id === oldTx.from_account_id);
-        const oldTo = db.accounts.find(a => a.id === oldTx.to_account_id);
-        
-        if(oldFrom) oldFrom.balance += oldTx.amount_extracted;
-        if(oldTo) oldTo.balance -= oldTx.amount_received;
-
-        oldTx.from_account_id = fromId; oldTx.to_account_id = toId;
-        oldTx.amount_extracted = amountExtracted; oldTx.amount_received = amountReceived;
-        oldTx.comment = commentVal;
-        oldTx.date = dateVal;
+        const oldTx = db.transactions.find(t => String(t.id) === String(editId));
+        if (oldTx) {
+            const oldFrom = db.accounts.find(a => String(a.id) === String(oldTx.from_account_id));
+            const oldTo = db.accounts.find(a => String(a.id) === String(oldTx.to_account_id));
+            
+            if(oldFrom) oldFrom.balance += oldTx.amount_extracted;
+            if(oldTo) oldTo.balance -= oldTx.amount_received;
+            
+            oldTx.from_account_id = fromId; oldTx.to_account_id = toId;
+            oldTx.amount_extracted = amountExtracted; oldTx.amount_received = amountReceived;
+            oldTx.comment = commentVal;
+            oldTx.date = dateVal;
+        }
     } else {
         db.transactions.push({
             id: crypto.randomUUID(), type: 'transfer', from_account_id: fromId, to_account_id: toId,
@@ -291,8 +302,8 @@ transferForm.addEventListener('submit', (e) => {
         });
     }
 
-    fromAcc.balance -= amountExtracted;
-    toAcc.balance += amountReceived;
+    if (fromAcc) fromAcc.balance -= amountExtracted;
+    if (toAcc) toAcc.balance += amountReceived;
 
     saveDB(); closeTransferModal(); renderHome(); renderSettings(); if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
 });
@@ -301,14 +312,16 @@ window.deleteCurrentTransfer = function() {
     const editId = document.getElementById('trans-edit-id').value;
     if(!editId) return;
     if(confirm("¿Eliminar permanentemente esta transferencia del historial?")) {
-        const oldTx = db.transactions.find(t => t.id === editId);
-        const oldFrom = db.accounts.find(a => a.id === oldTx.from_account_id);
-        const oldTo = db.accounts.find(a => a.id === oldTx.to_account_id);
-        
-        if(oldFrom) oldFrom.balance += oldTx.amount_extracted;
-        if(oldTo) oldTo.balance -= oldTx.amount_received;
+        const oldTx = db.transactions.find(t => String(t.id) === String(editId));
+        if (oldTx) {
+            const oldFrom = db.accounts.find(a => String(a.id) === String(oldTx.from_account_id));
+            const oldTo = db.accounts.find(a => String(a.id) === String(oldTx.to_account_id));
+            
+            if(oldFrom) oldFrom.balance += oldTx.amount_extracted;
+            if(oldTo) oldTo.balance -= oldTx.amount_received;
+        }
 
-        db.transactions = db.transactions.filter(t => t.id !== editId);
+        db.transactions = db.transactions.filter(t => String(t.id) !== String(editId));
         saveDB(); transferModal.classList.add('hidden'); transferForm.reset(); renderHome(); if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
     }
 }
