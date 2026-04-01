@@ -178,8 +178,8 @@ txForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const editId = document.getElementById('tx-edit-id').value;
     const amount = parseFloat(document.getElementById('amount').value);
-    const accId = parseInt(accSelect.value);
-    const catId = parseInt(catSelect.value);
+    const accId = /^\\d+$/.test(accSelect.value) ? parseInt(accSelect.value) : accSelect.value;
+    const catId = /^\\d+$/.test(catSelect.value) ? parseInt(catSelect.value) : catSelect.value;
     const dateVal = document.getElementById('date').value + "T00:00:00"; // Hora local, sin desfase UTC
 
     // Validar monto positivo
@@ -260,8 +260,8 @@ window.closeTransferModal = () => { transferModal.classList.add('hidden'); trans
 transferForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const editId = document.getElementById('trans-edit-id').value;
-    const fromId = parseInt(targetFrom.value);
-    const toId = parseInt(targetTo.value);
+    const fromId = /^\\d+$/.test(targetFrom.value) ? parseInt(targetFrom.value) : targetFrom.value;
+    const toId = /^\\d+$/.test(targetTo.value) ? parseInt(targetTo.value) : targetTo.value;
     const amountExtracted = parseFloat(document.getElementById('trans-amount').value);
     const amountReceived = parseFloat(document.getElementById('trans-received').value);
     const commentVal = document.getElementById('trans-comment').value.trim();
@@ -506,7 +506,7 @@ goalForm.addEventListener('submit', (e) => {
     const target = parseFloat(document.getElementById('goal-target').value);
     const icon = document.getElementById('goal-icon').value || 'fa-bullseye';
     const rawAccId = document.getElementById('goal-account').value;
-    const accId = rawAccId ? parseInt(rawAccId) : null;
+    const accId = rawAccId ? (/^\\d+$/.test(rawAccId) ? parseInt(rawAccId) : rawAccId) : null;
     const isEmergencyElem = document.getElementById('goal-is-emergency');
     const isEmergency = isEmergencyElem ? isEmergencyElem.checked : false;
 
@@ -708,8 +708,8 @@ window.renderAnalytics = function() {
     const rateContainer = document.querySelector('.current-rate');
 
     if (currentAnalyticsFilter === 'all') {
-        const expenseCatsTotal = db.categories.filter(c=>c.type==='expense').map(c=>c.id);
-        const sortedCats = Object.keys(catTotals).filter(k => expenseCatsTotal.includes(parseInt(k))).sort((a,b) => catTotals[b] - catTotals[a]);
+        const expenseCatsTotal = db.categories.filter(c=>c.type==='expense').map(c=>String(c.id));
+        const sortedCats = Object.keys(catTotals).filter(k => expenseCatsTotal.includes(k)).sort((a,b) => catTotals[b] - catTotals[a]);
         
         if(sortedCats.length === 0) {
             rateContainer.innerHTML = '<h3>Distribución de Gastos</h3><div class="empty-state">No hay transacciones en este periodo.</div>';
