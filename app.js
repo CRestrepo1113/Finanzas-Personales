@@ -100,8 +100,8 @@ window.toggleCategorySubtype = function() {
 // Transaction Helpers
 function renderTransactionHTML(tx) {
     if(tx.type === 'transfer') {
-        const fAcc = db.accounts.find(a => a.id === tx.from_account_id) || {name: '?', currency: 'USD'};
-        const tAcc = db.accounts.find(a => a.id === tx.to_account_id) || {name: '?', currency: 'USD'};
+        const fAcc = db.accounts.find(a => String(a.id) === String(tx.from_account_id)) || {name: '?', currency: 'USD'};
+        const tAcc = db.accounts.find(a => String(a.id) === String(tx.to_account_id)) || {name: '?', currency: 'USD'};
         const currSymbol = {USD:'$',EUR:'€',COP:'$',RUB:'₽'}[fAcc.currency] || '$';
         return `
         <div class="transaction-item" onclick="openEditDispatcher('${tx.id}')" style="cursor: pointer;">
@@ -115,10 +115,10 @@ function renderTransactionHTML(tx) {
             <div class="t-amount" style="color: var(--text-secondary)">${currSymbol}${(tx.amount_extracted||0).toFixed(2)} ${fAcc.currency}</div>
         </div>`;
     } else {
-        const cat = db.categories.find(c => c.id === tx.category_id) || {name: 'Borrada', type: 'expense', visual_color: '#000', icon: 'fa-ghost'};
+        const cat = db.categories.find(c => String(c.id) === String(tx.category_id)) || {name: 'Borrada', type: 'expense', visual_color: '#000', icon: 'fa-ghost'};
         const sign = cat.type === 'income' ? '+' : '-';
         const cssClass = cat.type === 'income' ? 'amount-income' : 'amount-expense';
-        const acc = db.accounts.find(a => a.id === tx.account_id) || {name: 'Desaparecida'};
+        const acc = db.accounts.find(a => String(a.id) === String(tx.account_id)) || {name: 'Desaparecida'};
         return `
         <div class="transaction-item" onclick="openEditDispatcher('${tx.id}')" style="cursor: pointer;">
             <div class="t-left">
@@ -139,7 +139,7 @@ window.openEditDispatcher = function(id) {
     if(!tx) return; // Guard: transacción no encontrada
     if(tx.type === 'transfer') openTransferModal(tx.id);
     else {
-        const cat = db.categories.find(c => c.id === tx.category_id) || {type: 'expense'};
+        const cat = db.categories.find(c => String(c.id) === String(tx.category_id)) || {type: 'expense'};
         openModal(cat.type, tx.id);
     }
 }
@@ -680,7 +680,7 @@ window.renderAnalytics = function() {
         if(tx.type === 'transfer') {
             totalTransferred += tx.amount_extracted;
         } else {
-            const cat = db.categories.find(c => c.id === tx.category_id);
+            const cat = db.categories.find(c => String(c.id) === String(tx.category_id));
             if(!cat) return;
             if(cat.type === 'income') { totalIncome += tx.amount; catTotals[cat.id] = (catTotals[cat.id] || 0) + tx.amount; } 
             else { totalExpense += tx.amount; catTotals[cat.id] = (catTotals[cat.id] || 0) + tx.amount; }
@@ -800,7 +800,7 @@ window.renderAnalytics = function() {
         const finalHistory = timeFilteredHistory.filter(tx => {
             if(currentAnalyticsFilter === 'transfer') return tx.type === 'transfer';
             if(tx.type === 'transfer') return false;
-            const cat = db.categories.find(c => c.id === tx.category_id);
+            const cat = db.categories.find(c => String(c.id) === String(tx.category_id));
             if(!cat || cat.type !== currentAnalyticsFilter) return false;
             if(activeCatId !== 'all' && cat.id != activeCatId) return false;
             return true;
