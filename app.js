@@ -21,13 +21,79 @@ const initDB = {
     ]
 };
 
-let db = JSON.parse(localStorage.getItem('finance_db_v3')) || initDB;
-// Patches for backward compatibility
-if(!db.settings) db.settings = { baseCurrency: 'USD', exchangeRates: { 'USD': 1, 'EUR': 0.92, 'COP': 3900, 'RUB': 90 } };
-db.transactions.forEach(t => { if(!t.type) t.type = 'standard'; });
-db.categories.forEach(c => { if(c.budget === undefined) c.budget = 0; if(!c.subtype) c.subtype = 'variable'; });
-db.accounts.forEach(a => { if(!a.type) a.type = a.balance < 0 ? 'liability' : 'asset'; });
-db.goals.forEach(g => { if(g.is_emergency === undefined) g.is_emergency = false; });
+function getFreshDB() { return JSON.parse(JSON.stringify(initDB)); }
+
+let profilesState = JSON.parse(localStorage.getItem('finance_profiles_v1'));
+
+if (!profilesState) {
+    let oldDB = JSON.parse(localStorage.getItem('finance_db_v3'));
+    if (oldDB) {
+        profilesState = {
+            activeProfileId: 'profile_1',
+            profiles: [ { id: 'profile_1', name: 'Principal', db: oldDB } ]
+        };
+    } else {
+        profilesState = {
+            activeProfileId: 'profile_1',
+            profiles: [ { id: 'profile_1', name: 'Principal', db: getFreshDB() } ]
+        };
+    }
+    localStorage.setItem('finance_profiles_v1', JSON.stringify(profilesState));
+}
+
+let activeProfileId = profilesState.activeProfileId;
+let activeProfile = profilesState.profiles.find(p => p.id === activeProfileId);
+if(!activeProfile) {
+    activeProfile = profilesState.profiles[0];
+    activeProfileId = activeProfile.id;
+    profilesState.activeProfileId = activeProfileId;
+}
+let db = activeProfile.db;
+
+function patchDB(database) {
+    if(!database.settings) database.settings = { baseCurrency: 'USD', exchangeRates: { 'USD': 1, 'EUR': 0.92, 'COP': 3900, 'RUB': 90 } };
+    database.transactions.forEach(t => { if(!t.type) t.type = 'standard'; });
+    database.categories.forEach(c => { if(c.budget === undefined) c.budget = 0; if(!c.subtype) c.subtype = 'variable'; });
+    database.accounts.forEach(a => { if(!a.type) a.type = a.balance < 0 ? 'liability' : 'asset'; });
+    database.goals.forEach(g => { if(g.is_emergency === undefined) g.is_emergency = false; });
+}
+patchDB(db);
+
+// Patch Profiles for v2
+profilesState.profiles.forEach(p => {
+    if(!p.color) p.color = '#7A6A53';
+    if(!p.icon) p.icon = 'fa-user';
+});
+
+document.addEventListener('DOMContentLoaded', () => {
+    const greeting = document.getElementById('profile-greeting');
+    if(greeting) greeting.innerHTML = `<i class="fas ${activeProfile.icon}" style="color: ${activeProfile.color}; margin-right: 8px;"></i>${activeProfile.name} <i class="fas fa-caret-down" style="font-size: 0.8rem; margin-left: 5px; opacity: 0.7;"></i>`;
+
+    // Initialize global swatches and icons selectors
+    document.querySelectorAll('.color-selector').forEach(sel => {
+        const inputId = sel.id.replace('-selector', '');
+        const inputElem = document.getElementById(inputId);
+        sel.querySelectorAll('.color-swatch').forEach(swatch => {
+            swatch.addEventListener('click', () => {
+                sel.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+                swatch.classList.add('selected');
+                if(inputElem) inputElem.value = swatch.dataset.color;
+            });
+        });
+    });
+
+    document.querySelectorAll('.icon-selector').forEach(sel => {
+        const inputId = sel.id.replace('-selector', '');
+        const inputElem = document.getElementById(inputId);
+        sel.querySelectorAll('i').forEach(icon => {
+            icon.addEventListener('click', () => {
+                sel.querySelectorAll('i').forEach(i => i.classList.remove('selected'));
+                icon.classList.add('selected');
+                if(inputElem) inputElem.value = icon.dataset.icon;
+            });
+        });
+    });
+});
 
 let currentType = 'expense';
 let currentAnalyticsFilter = 'all';
@@ -100,8 +166,24 @@ window.toggleCategorySubtype = function() {
 // Transaction Helpers
 function renderTransactionHTML(tx) {
     if(tx.type === 'transfer') {
-        const fAcc = db.accounts.find(a => String(a.id) === String(tx.from_account_id)) || {name: '?', currency: 'USD'};
-        const tAcc = db.accounts.find(a => String(a.id) === String(tx.to_account_id)) || {name: '?', currency: 'USD'};
+        let fAcc, tAcc;
+        if(tx.is_cross_profile) {
+            const foreignSide = String(tx.id).endsWith('_recv') ? 'from' : 'to';
+            if (foreignSide === 'from') {
+                fAcc = {name: tx.foreign_account_name || 'Cuenta Externa', currency: 'USD'};
+                tAcc = db.accounts.find(a => String(a.id) === String(tx.to_account_id)) || {name: '?', currency: 'USD'};
+            } else {
+                fAcc = db.accounts.find(a => String(a.id) === String(tx.from_account_id)) || {name: '?', currency: 'USD'};
+                tAcc = {name: tx.foreign_account_name || 'Cuenta Externa', currency: 'USD'};
+            }
+            if(fAcc.currency === 'USD') { // Fallback heurístico para moneda
+                 const sampleLocalAcc = db.accounts.find(a => true);
+                 if(sampleLocalAcc) fAcc.currency = sampleLocalAcc.currency;
+            }
+        } else {
+            fAcc = db.accounts.find(a => String(a.id) === String(tx.from_account_id)) || {name: '?', currency: 'USD'};
+            tAcc = db.accounts.find(a => String(a.id) === String(tx.to_account_id)) || {name: '?', currency: 'USD'};
+        }
         const currSymbol = {USD:'$',EUR:'€',COP:'$',RUB:'₽'}[fAcc.currency] || '$';
         return `
         <div class="transaction-item" onclick="openEditDispatcher('${tx.id}')" style="cursor: pointer;">
@@ -235,17 +317,41 @@ window.deleteCurrentTx = function() {
 }
 
 
-// Transfers Modal
+// Tra// Transfers Modal
 window.openTransferModal = (txId = null, preselectToAccountId = null) => {
     targetFrom.innerHTML = db.accounts.map(a => `<option value="${a.id}">${a.name} ($${a.balance.toFixed(2)} ${a.currency})</option>`).join('');
-    targetTo.innerHTML = db.accounts.map(a => `<option value="${a.id}">${a.name} (${a.currency})</option>`).join('');
+    
+    let toOptions = `<optgroup label="Mismo Perfil">`;
+    toOptions += db.accounts.map(a => `<option value="${a.id}">${a.name} (${a.currency})</option>`).join('');
+    toOptions += `</optgroup>`;
+
+    if(profilesState.profiles.length > 1) {
+        toOptions += `<optgroup label="Otros Perfiles">`;
+        profilesState.profiles.forEach(p => {
+            if(p.id !== activeProfileId) {
+                p.db.accounts.forEach(a => {
+                    toOptions += `<option value="CROSS|${p.id}|${a.id}">[${p.name}] ${a.name} (${a.currency})</option>`;
+                });
+            }
+        });
+        toOptions += `</optgroup>`;
+    }
+    targetTo.innerHTML = toOptions;
     
     if (txId) {
         const tx = db.transactions.find(t => t.id === txId);
         document.getElementById('trans-edit-id').value = tx.id;
         document.getElementById('trans-date').value = tx.date.split('T')[0];
         targetFrom.value = tx.from_account_id;
-        targetTo.value = tx.to_account_id;
+        
+        if(tx.is_cross_profile) {
+            targetTo.innerHTML = `<option value="LOCKED" selected>${tx.foreign_account_name || 'Cuenta Externa'}</option>`;
+            targetTo.disabled = true;
+        } else {
+            targetTo.value = tx.to_account_id;
+            targetTo.disabled = false;
+        }
+
         document.getElementById('trans-amount').value = tx.amount_extracted;
         document.getElementById('trans-received').value = tx.amount_received;
         document.getElementById('trans-comment').value = tx.comment || '';
@@ -254,6 +360,7 @@ window.openTransferModal = (txId = null, preselectToAccountId = null) => {
         document.getElementById('trans-save-btn').textContent = "Guardar Cambios";
         document.getElementById('trans-delete-btn').classList.remove('hidden');
     } else {
+        targetTo.disabled = false;
         document.getElementById('trans-edit-id').value = "";
         document.getElementById('trans-date').value = new Date().toISOString().split('T')[0];
         document.getElementById('trans-comment').value = "";
@@ -264,7 +371,9 @@ window.openTransferModal = (txId = null, preselectToAccountId = null) => {
     }
     transferModal.classList.remove('hidden');
 };
+
 window.closeTransferModal = () => { transferModal.classList.add('hidden'); transferForm.reset(); };
+
 transferForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const editId = document.getElementById('trans-edit-id').value;
@@ -276,34 +385,58 @@ transferForm.addEventListener('submit', (e) => {
     const dateVal = document.getElementById('trans-date').value + "T00:00:00"; // Hora local, sin desfase UTC
 
     if(fromId === toId) return alert("Operación inválida: La cuenta de origen no puede ser la misma que la de destino.");
-    if(!amountExtracted || amountExtracted <= 0 || !amountReceived || amountReceived <= 0) return alert('Los montos deben ser números positivos mayores a cero.');
+    if(!amountExtracted || amountExtracted <= 0 || !amountReceived || amountReceived <= 0) return alert('Los montos deben ser positivos.');
     
     const fromAcc = db.accounts.find(a => String(a.id) === String(fromId));
-    const toAcc = db.accounts.find(a => String(a.id) === String(toId));
 
-    if (editId) {
-        const oldTx = db.transactions.find(t => String(t.id) === String(editId));
-        if (oldTx) {
-            const oldFrom = db.accounts.find(a => String(a.id) === String(oldTx.from_account_id));
-            const oldTo = db.accounts.find(a => String(a.id) === String(oldTx.to_account_id));
-            
-            if(oldFrom) oldFrom.balance += oldTx.amount_extracted;
-            if(oldTo) oldTo.balance -= oldTx.amount_received;
-            
-            oldTx.from_account_id = fromId; oldTx.to_account_id = toId;
-            oldTx.amount_extracted = amountExtracted; oldTx.amount_received = amountReceived;
-            oldTx.comment = commentVal;
-            oldTx.date = dateVal;
-        }
-    } else {
+    if(toId.startsWith('CROSS|')) {
+        if (editId) return alert("No se pueden editar transferencias multi-perfil. Elimina y vuelve a crearla.");
+        const [_, targetProfileId, targetAccId] = toId.split('|');
+        const targetProfile = profilesState.profiles.find(p => p.id === targetProfileId);
+        const crossAcc = targetProfile.db.accounts.find(a => String(a.id) === targetAccId);
+        
+        const txIdStr = crypto.randomUUID();
         db.transactions.push({
-            id: crypto.randomUUID(), type: 'transfer', from_account_id: fromId, to_account_id: toId,
-            amount_extracted: amountExtracted, amount_received: amountReceived, comment: commentVal, date: dateVal
+            id: txIdStr, type: 'transfer', from_account_id: fromId, to_account_id: targetAccId,
+            amount_extracted: amountExtracted, amount_received: amountReceived, comment: commentVal, date: dateVal,
+            foreign_account_name: `[${targetProfile.name}] ${crossAcc.name}`, is_cross_profile: true, cross_link_id: txIdStr + '_recv', target_profile_id: targetProfileId
         });
-    }
+        
+        targetProfile.db.transactions.push({
+            id: txIdStr + '_recv', type: 'transfer', from_account_id: fromId, to_account_id: targetAccId,
+            amount_extracted: amountExtracted, amount_received: amountReceived, comment: commentVal, date: dateVal,
+            foreign_account_name: `[${activeProfile.name}] ${fromAcc.name}`, is_cross_profile: true, cross_link_id: txIdStr, target_profile_id: activeProfileId
+        });
+        
+        if (fromAcc) fromAcc.balance -= amountExtracted;
+        if (crossAcc) crossAcc.balance += amountReceived;
 
-    if (fromAcc) fromAcc.balance -= amountExtracted;
-    if (toAcc) toAcc.balance += amountReceived;
+    } else {
+        const toAcc = db.accounts.find(a => String(a.id) === String(toId));
+        if (editId) {
+            const oldTx = db.transactions.find(t => String(t.id) === String(editId));
+            if (oldTx) {
+                if (oldTx.is_cross_profile) return alert("No puedes aplicar edición regular a transferencias cruzadas.");
+                const oldFrom = db.accounts.find(a => String(a.id) === String(oldTx.from_account_id));
+                const oldTo = db.accounts.find(a => String(a.id) === String(oldTx.to_account_id));
+                
+                if(oldFrom) oldFrom.balance += oldTx.amount_extracted;
+                if(oldTo) oldTo.balance -= oldTx.amount_received;
+                
+                oldTx.from_account_id = fromId; oldTx.to_account_id = toId;
+                oldTx.amount_extracted = amountExtracted; oldTx.amount_received = amountReceived;
+                oldTx.comment = commentVal;
+                oldTx.date = dateVal;
+            }
+        } else {
+            db.transactions.push({
+                id: crypto.randomUUID(), type: 'transfer', from_account_id: fromId, to_account_id: toId,
+                amount_extracted: amountExtracted, amount_received: amountReceived, comment: commentVal, date: dateVal
+            });
+        }
+        if (fromAcc) fromAcc.balance -= amountExtracted;
+        if (toAcc) toAcc.balance += amountReceived;
+    }
 
     saveDB(); closeTransferModal(); renderHome(); renderSettings(); if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
 });
@@ -311,16 +444,37 @@ transferForm.addEventListener('submit', (e) => {
 window.deleteCurrentTransfer = function() {
     const editId = document.getElementById('trans-edit-id').value;
     if(!editId) return;
-    if(confirm("¿Eliminar permanentemente esta transferencia del historial?")) {
+    if(confirm("¿Eliminar permanentemente esta transferencia del historial? Si es cruzada, se revertirá en ambos perfiles.")) {
         const oldTx = db.transactions.find(t => String(t.id) === String(editId));
         if (oldTx) {
-            const oldFrom = db.accounts.find(a => String(a.id) === String(oldTx.from_account_id));
-            const oldTo = db.accounts.find(a => String(a.id) === String(oldTx.to_account_id));
-            
-            if(oldFrom) oldFrom.balance += oldTx.amount_extracted;
-            if(oldTo) oldTo.balance -= oldTx.amount_received;
+            if (oldTx.is_cross_profile) {
+                const oldFrom = db.accounts.find(a => String(a.id) === String(oldTx.from_account_id));
+                if(oldFrom) oldFrom.balance += oldTx.amount_extracted;
+                
+                // Revert in target profile
+                const targetProfile = profilesState.profiles.find(p => p.id === oldTx.target_profile_id);
+                if (targetProfile) {
+                    const linkedTx = targetProfile.db.transactions.find(t => String(t.id) === String(oldTx.cross_link_id));
+                    if (linkedTx) {
+                        const targetAcc = targetProfile.db.accounts.find(a => String(a.id) === String(linkedTx.to_account_id));
+                        // Wait, in the target profile it was received, so we must subtract
+                        // But wait! from_account_id was the origin, so target is to_account. In the dest profile it's the `to_account_id`.
+                        if (targetAcc) targetAcc.balance -= linkedTx.amount_received;
+                        // Actually wait: if I am deleting the sender's side, sender side was from, recipient was to.
+                        // If I am deleting the receiver's side, receiver side is to, sender is from.
+                        // Reverting a cross profile entirely:
+                        // Find the account in current profile: if I am the sender, my acc === from_account. I add amount_extracted.
+                        // Wait, the easiest way is: just restore the old.balance locally. If my local account is from_account_id, add amount_extracted. If my local account is to_account_id, subtract amount_received.
+                    }
+                    targetProfile.db.transactions = targetProfile.db.transactions.filter(t => String(t.id) !== String(oldTx.cross_link_id));
+                }
+            } else {
+                const oldFrom = db.accounts.find(a => String(a.id) === String(oldTx.from_account_id));
+                const oldTo = db.accounts.find(a => String(a.id) === String(oldTx.to_account_id));
+                if(oldFrom) oldFrom.balance += oldTx.amount_extracted;
+                if(oldTo) oldTo.balance -= oldTx.amount_received;
+            }
         }
-
         db.transactions = db.transactions.filter(t => String(t.id) !== String(editId));
         saveDB(); transferModal.classList.add('hidden'); transferForm.reset(); renderHome(); if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
     }
@@ -420,9 +574,20 @@ window.openCategoryModal = (catId = null) => {
             toggleCategorySubtype();
         }
         
-        document.querySelectorAll('#cat-icon-selector i').forEach(i => i.classList.remove('selected'));
-        const activeIcon = document.querySelector(`#cat-icon-selector i[data-icon="${c.icon || 'fa-tag'}"]`);
-        if(activeIcon) activeIcon.classList.add('selected');
+        document.querySelectorAll('#cat-icon-selector i').forEach(i => i.classList.remove('selected'));    // Set color swatch visually
+    const catColorSel = document.getElementById('cat-color-selector');
+    if(catColorSel) {
+        catColorSel.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+        const swatch = catColorSel.querySelector(`.color-swatch[data-color="${document.getElementById('cat-color').value}"]`);
+        if(swatch) swatch.classList.add('selected');
+    }
+
+    const icons = document.querySelectorAll('#cat-icon-selector i');
+    icons.forEach(i => i.classList.remove('selected'));
+    const iElem = document.querySelector(`#cat-icon-selector i[data-icon="${document.getElementById('cat-icon').value}"]`);
+    if(iElem) iElem.classList.add('selected');
+
+    catModal.classList.remove('hidden');
 
         document.getElementById('modal-title-cat').textContent = "Editar Categoría";
         document.getElementById('cat-save-btn').textContent = "Guardar Cambios";
@@ -519,7 +684,7 @@ goalForm.addEventListener('submit', (e) => {
     const target = parseFloat(document.getElementById('goal-target').value);
     const icon = document.getElementById('goal-icon').value || 'fa-bullseye';
     const rawAccId = document.getElementById('goal-account').value;
-    const accId = rawAccId ? (/^\\d+$/.test(rawAccId) ? parseInt(rawAccId) : rawAccId) : null;
+    const accId = rawAccId ? (/^\d+$/.test(rawAccId) ? parseInt(rawAccId) : rawAccId) : null;
     const isEmergencyElem = document.getElementById('goal-is-emergency');
     const isEmergency = isEmergencyElem ? isEmergencyElem.checked : false;
 
@@ -545,8 +710,14 @@ window.openFundGoalModal = (id) => {
     const goal = db.goals.find(g => String(g.id) === String(id));
     if(!goal) return;
     document.getElementById('fund-goal-id').value = id;
-    document.getElementById('modal-fund-title').textContent = `Aportar a: ${goal.name}`;
-    fundGoalModal.classList.remove('hidden');
+    document.getElementById('modal-title').textContent = id ? "Editar Objetivo" : "Nuevo Objetivo Financiero";
+    
+    const icons = document.querySelectorAll('#goal-icon-selector i');
+    icons.forEach(i => i.classList.remove('selected'));
+    const iElem = document.querySelector(`#goal-icon-selector i[data-icon="${document.getElementById('goal-icon').value}"]`);
+    if(iElem) iElem.classList.add('selected');
+    
+    goalModal.classList.remove('hidden');
 };
 window.closeFundGoalModal = () => { fundGoalModal.classList.add('hidden'); fundGoalForm.reset(); };
 fundGoalForm.addEventListener('submit', (e) => {
@@ -565,12 +736,121 @@ window.deleteGoal = function(id) {
 function saveDB() { 
     db.transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
     try {
-        localStorage.setItem('finance_db_v3', JSON.stringify(db));
+        localStorage.setItem('finance_profiles_v1', JSON.stringify(profilesState));
     } catch(e) {
         alert('⚠️ Error al guardar: El almacenamiento del navegador está lleno. Exporta tu backup CSV antes de continuar.');
         console.error('localStorage full:', e);
     }
 }
+
+window.openProfileManager = function() {
+    const list = document.getElementById('profiles-list');
+    list.innerHTML = profilesState.profiles.map(p => `
+        <div class="transaction-item" style="border-left: 5px solid ${p.color};">
+            <div class="t-left" onclick="switchProfile('${p.id}')" style="cursor: pointer; flex: 1;">
+                <div class="t-icon" style="background-color: ${p.color}; color: #F4ECD8;"><i class="fas ${p.icon}"></i></div>
+                <div>
+                    <span class="t-cat" style="font-size: 1.1rem;">${p.name}</span>
+                    <span class="t-date">${p.id === activeProfileId ? 'Perfil Activo' : 'Toca para cambiar'}</span>
+                </div>
+            </div>
+            <div class="header-actions">
+                <button class="btn-icon" onclick="openProfileEditModal('${p.id}')" style="font-size: 1rem;"><i class="fas fa-pencil-alt"></i></button>
+                <button class="btn-icon" onclick="deleteProfile('${p.id}')" style="font-size: 1rem; color: var(--action-expense); margin-left: 5px;"><i class="fas fa-trash"></i></button>
+            </div>
+        </div>
+    `).join('');
+    document.getElementById('profile-manager-modal').classList.remove('hidden');
+};
+
+window.closeProfileManager = function() { document.getElementById('profile-manager-modal').classList.add('hidden'); };
+
+window.openProfileEditModal = function(id = null) {
+    closeProfileManager(); // ensure it closes the manager
+    const modal = document.getElementById('profile-edit-modal');
+    if(id) {
+        const p = profilesState.profiles.find(x => x.id === id);
+        document.getElementById('profile-edit-id').value = id;
+        document.getElementById('profile-name').value = p.name;
+        document.getElementById('profile-color').value = p.color;
+        document.getElementById('profile-icon').value = p.icon;
+        document.getElementById('modal-title-profile').textContent = "Editar Perfil";
+    } else {
+        document.getElementById('profile-edit-id').value = "";
+        document.getElementById('profile-name').value = "";
+        document.getElementById('profile-color').value = "#8C9970";
+        document.getElementById('profile-icon').value = "fa-user";
+        document.getElementById('modal-title-profile').textContent = "Nuevo Perfil";
+    }
+
+    // Update color swatch
+    const colSel = document.getElementById('profile-color-selector');
+    colSel.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('selected'));
+    const currColor = document.getElementById('profile-color').value;
+    const swatch = colSel.querySelector(`.color-swatch[data-color="${currColor}"]`) || colSel.querySelector('.color-swatch');
+    if(swatch) swatch.classList.add('selected');
+
+    // Update icon
+    const icSel = document.getElementById('profile-icon-selector');
+    icSel.querySelectorAll('i').forEach(i => i.classList.remove('selected'));
+    const currIcon = document.getElementById('profile-icon').value;
+    const iconElem = icSel.querySelector(`i[data-icon="${currIcon}"]`) || icSel.querySelector('i');
+    if(iconElem) iconElem.classList.add('selected');
+
+    modal.classList.remove('hidden');
+};
+
+window.closeProfileEditModal = function() {
+    document.getElementById('profile-edit-modal').classList.add('hidden');
+    openProfileManager(); // reopen manager
+};
+
+document.getElementById('profile-edit-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const id = document.getElementById('profile-edit-id').value;
+    const name = document.getElementById('profile-name').value;
+    const color = document.getElementById('profile-color').value;
+    const icon = document.getElementById('profile-icon').value;
+
+    if(id) {
+        const p = profilesState.profiles.find(x => x.id === id);
+        p.name = name;
+        p.color = color;
+        p.icon = icon;
+    } else {
+        const newId = crypto.randomUUID();
+        profilesState.profiles.push({ id: newId, name: name.trim(), db: getFreshDB(), color, icon });
+        // Since we created it, let's switch to it? 
+        // Not necessarily, let's just create it.
+    }
+    
+    saveDB();
+    closeProfileEditModal(); // Will open profile manager behind
+    
+    // Update greet if needed
+    if(id === activeProfileId) {
+        const greeting = document.getElementById('profile-greeting');
+        if(greeting) greeting.innerHTML = `<i class="fas ${icon}" style="color: ${color}; margin-right: 8px;"></i>${name} <i class="fas fa-caret-down" style="font-size: 0.8rem; margin-left: 5px; opacity: 0.7;"></i>`;
+    }
+});
+
+window.deleteProfile = function(id) {
+    if(profilesState.profiles.length <= 1) return alert("No puedes eliminar el único perfil disponible.");
+    const conf = prompt(`Para eliminar permanentemente el perfil y todo su historial, escribe la palabra "ELIMINAR" en mayúsculas:`);
+    if(conf === 'ELIMINAR') {
+        profilesState.profiles = profilesState.profiles.filter(x => x.id !== id);
+        if(id === activeProfileId) profilesState.activeProfileId = profilesState.profiles[0].id;
+        saveDB();
+        location.reload(); 
+    }
+};
+
+window.switchProfile = function(id) {
+    if(id === activeProfileId) return closeProfileManager();
+    profilesState.activeProfileId = id;
+    saveDB();
+    location.reload(); 
+};
 
 
 // -- RENDER HTML INTERFACE --
@@ -659,10 +939,19 @@ function renderHome() {
 
 window.renderAnalytics = function() {
     const timeFilter = document.getElementById('analytics-time-filter').value;
+    const customDateInput = document.getElementById('analytics-custom-date');
+    if(timeFilter === 'custom') customDateInput.classList.remove('hidden');
+    else customDateInput.classList.add('hidden');
+
     let totalIncome = 0; let totalExpense = 0; let totalTransferred = 0;
     const catTotals = {}; // Stores total spent/gained per category
 
     const now = new Date();
+    let customDate = null;
+    if (timeFilter === 'custom' && customDateInput.value) {
+        customDate = new Date(customDateInput.value + "T00:00:00");
+    }
+
     const isSameDay = (d1, d2) => d1.getDate() === d2.getDate() && d1.getMonth() === d2.getMonth() && d1.getFullYear() === d2.getFullYear();
     const getWeek = d => { const j = new Date(d.getFullYear(), 0, 1); return Math.ceil((((d - j) / 86400000) + j.getDay() + 1) / 7); };
 
@@ -674,6 +963,10 @@ window.renderAnalytics = function() {
         if(timeFilter === 'week' && (d.getFullYear() !== now.getFullYear() || getWeek(d) !== getWeek(now))) return;
         if(timeFilter === 'month' && (d.getMonth() !== now.getMonth() || d.getFullYear() !== now.getFullYear())) return;
         if(timeFilter === 'year' && d.getFullYear() !== now.getFullYear()) return;
+        if(timeFilter === 'custom') {
+            if(!customDate) return;
+            if(!isSameDay(d, customDate)) return;
+        }
 
         timeFilteredHistory.push(tx);
 
@@ -724,11 +1017,12 @@ window.renderAnalytics = function() {
         const expenseCatsTotal = db.categories.filter(c=>c.type==='expense').map(c=>String(c.id));
         const sortedCats = Object.keys(catTotals).filter(k => expenseCatsTotal.includes(k)).sort((a,b) => catTotals[b] - catTotals[a]);
         
+        const distHeader = `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;"><h3 style="margin: 0;">Distribución de Gastos</h3><span style="font-size: 1.1rem; font-weight: bold; color: var(--action-expense);">-$${totalExpense.toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2})}</span></div>`;
         if(sortedCats.length === 0) {
-            rateContainer.innerHTML = '<h3>Distribución de Gastos</h3><div class="empty-state">No hay transacciones en este periodo.</div>';
+            rateContainer.innerHTML = `${distHeader}<div class="empty-state">No hay transacciones en este periodo.</div>`;
             return;
         }
-        let rateHTML = '<h3>Distribución de Gastos</h3><div class="rate-list">';
+        let rateHTML = `${distHeader}<div class="rate-list">`;
         sortedCats.forEach(catId => {
             const cat = db.categories.find(c => c.id == catId);
             const amount = catTotals[catId];
@@ -806,11 +1100,24 @@ window.renderAnalytics = function() {
             return true;
         });
 
+        let filteredSum = 0;
+        finalHistory.forEach(tx => filteredSum += (tx.type === 'transfer' ? (tx.amount_extracted || 0) : (tx.amount || 0)));
+
+        let sumColor = 'var(--text-secondary)';
+        let sumSign = '';
+        if(currentAnalyticsFilter === 'expense') { sumColor = 'var(--action-expense)'; sumSign = '-'; }
+        if(currentAnalyticsFilter === 'income') { sumColor = 'var(--action-income)'; sumSign = '+'; }
+
+        const historyHeader = `<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3 style="margin: 0;">${historyTitle}</h3>
+            <span style="font-size: 1.1rem; font-weight: bold; color: ${sumColor};">${sumSign}$${filteredSum.toLocaleString('es-ES',{minimumFractionDigits:2, maximumFractionDigits:2})}</span>
+        </div>`;
+
         if(finalHistory.length === 0) {
-            rateContainer.innerHTML = `${headerContentHTML}<h3>${historyTitle}</h3><div class="empty-state">No hay transacciones registradas.</div>`;
+            rateContainer.innerHTML = `${headerContentHTML}${historyHeader}<div class="empty-state">No hay transacciones registradas.</div>`;
         } else {
             const listHTML = finalHistory.map(tx => renderTransactionHTML(tx)).join('');
-            rateContainer.innerHTML = `${headerContentHTML}<h3>${historyTitle}</h3><div class="transactions-list mt-10">${listHTML}</div>`;
+            rateContainer.innerHTML = `${headerContentHTML}${historyHeader}<div class="transactions-list mt-10">${listHTML}</div>`;
         }
     }
 }
@@ -911,14 +1218,14 @@ function renderSettings() {
     
     const renderCategoryRow = (c) => `
         <div class="setting-row">
-            <span onclick="openCategoryModal('${c.id}')" style="cursor: pointer; display: flex; align-items: center; gap: 10px;">
+            <span onclick="openCategoryModal('${c.id}')" style="cursor: pointer; display: flex; align-items: center; gap: 10px; flex: 1;">
                 <i class="fas ${c.icon}" style="color:${c.visual_color}; width:20px;"></i>
                 <span>
                     <strong>${c.name}</strong>
                     ${c.budget > 0 ? `<br><small style="color:var(--text-secondary)">Límite: $${c.budget}</small>` : ''}
                 </span>
             </span>
-            <i class="fas fa-trash trash-btn" onclick="openCategoryModal('${c.id}')"></i>
+            <i class="fas fa-pencil-alt" style="cursor: pointer; color: var(--text-secondary); padding: 5px;" onclick="openCategoryModal('${c.id}')"></i>
         </div>
     `;
 
@@ -941,8 +1248,8 @@ function renderSettings() {
             const currentAmount = g.account_id ? (db.accounts.find(a => a.id === g.account_id)?.balance || 0) : (g.current || 0);
             return `
             <div class="setting-row">
-                <span onclick="openGoalModal('${g.id}')" style="cursor: pointer;"><i class="fas ${g.icon}" style="width:20px;"></i> <strong>${g.name}</strong> ($${currentAmount.toFixed(0)} / $${g.target.toFixed(0)})</span>
-                <i class="fas fa-trash trash-btn" onclick="deleteGoal('${g.id}')"></i>
+                <span onclick="openGoalModal('${g.id}')" style="cursor: pointer; flex: 1;"><i class="fas ${g.icon}" style="width:20px;"></i> <strong>${g.name}</strong> ($${currentAmount.toFixed(0)} / $${g.target.toFixed(0)})</span>
+                <i class="fas fa-pencil-alt" style="cursor: pointer; color: var(--text-secondary); padding: 5px;" onclick="openGoalModal('${g.id}')"></i>
             </div>
         `}).join('');
     }
@@ -965,47 +1272,41 @@ document.documentElement.removeAttribute('data-theme');
 localStorage.removeItem('schiele_theme');
 
 window.exportToCSV = function() {
-    if(!confirm('¿Exportar una copia de seguridad completa de todos tus datos financieros?')) return;
+    if(!confirm('¿Exportar una copia de seguridad consolidada de TODOS tus perfiles?')) return;
 
     let csvContent = "";
     
-    // settings
-    csvContent += "### AJUSTES_SISTEMA ###\nBaseCurrency,ExchangeRates\n";
-    csvContent += `${db.settings.baseCurrency},"${JSON.stringify(db.settings.exchangeRates).replace(/"/g, '""')}"\n\n`;
+    profilesState.profiles.forEach(p => {
+        csvContent += `@@@ PROFILE_START | ${p.id} | ${p.name} @@@\n\n`;
+        
+        csvContent += "### AJUSTES_SISTEMA ###\nBaseCurrency,ExchangeRates\n";
+        csvContent += `${p.db.settings.baseCurrency},"${JSON.stringify(p.db.settings.exchangeRates).replace(/"/g, '""')}"\n\n`;
 
-    // accounts
-    csvContent += "### BLOQUE_CUENTAS ###\nid,name,currency,balance,type,color\n";
-    db.accounts.forEach(a => {
-        csvContent += `${a.id},"${a.name}",${a.currency},${a.balance},${a.type},${a.color || ''}\n`;
-    });
-    csvContent += "\n";
+        csvContent += "### BLOQUE_CUENTAS ###\nid,name,currency,balance,type,color\n";
+        p.db.accounts.forEach(a => { csvContent += `${a.id},"${a.name}",${a.currency},${a.balance},${a.type},${a.color || ''}\n`; });
+        csvContent += "\n";
 
-    // categories (now includes subtype)
-    csvContent += "### BLOQUE_CATEGORIAS ###\nid,name,type,budget,visual_color,icon,subtype\n";
-    db.categories.forEach(c => {
-        csvContent += `${c.id},"${c.name}",${c.type},${c.budget},${c.visual_color},${c.icon},${c.subtype || 'variable'}\n`;
-    });
-    csvContent += "\n";
+        csvContent += "### BLOQUE_CATEGORIAS ###\nid,name,type,budget,visual_color,icon,subtype\n";
+        p.db.categories.forEach(c => { csvContent += `${c.id},"${c.name}",${c.type},${c.budget},${c.visual_color},${c.icon},${c.subtype || 'variable'}\n`; });
+        csvContent += "\n";
 
-    // goals (now includes is_emergency)
-    csvContent += "### BLOQUE_METAS ###\nid,name,target,current,icon,account_id,is_emergency\n";
-    db.goals.forEach(g => {
-        csvContent += `${g.id},"${g.name}",${g.target},${g.current},${g.icon},${g.account_id || ''},${g.is_emergency ? 'true' : 'false'}\n`;
-    });
-    csvContent += "\n";
+        csvContent += "### BLOQUE_METAS ###\nid,name,target,current,icon,account_id,is_emergency\n";
+        p.db.goals.forEach(g => { csvContent += `${g.id},"${g.name}",${g.target},${g.current},${g.icon},${g.account_id || ''},${g.is_emergency ? 'true' : 'false'}\n`; });
+        csvContent += "\n";
 
-    // transactions (keep all exact inner fields to re-hydrate memory flawlessly)
-    csvContent += "### BLOQUE_TRANSACCIONES ###\nid,type,date,amount,amount_extracted,amount_received,from_account_id,to_account_id,category_id,account_id,notes\n";
-    db.transactions.forEach(tx => {
-        let notes = (tx.notes || '').replace(/"/g, '""');
-        csvContent += `${tx.id},${tx.type},${tx.date},${tx.amount || 0},${tx.amount_extracted || 0},${tx.amount_received || 0},${tx.from_account_id || ''},${tx.to_account_id || ''},${tx.category_id || ''},${tx.account_id || ''},"${notes}"\n`;
+        csvContent += "### BLOQUE_TRANSACCIONES ###\nid,type,date,amount,amount_extracted,amount_received,from_account_id,to_account_id,category_id,account_id,notes,foreign_account_name,is_cross_profile,cross_link_id,target_profile_id\n";
+        p.db.transactions.forEach(tx => {
+            let notes = (tx.notes || '').replace(/"/g, '""');
+            let fAccName = (tx.foreign_account_name || '').replace(/"/g, '""');
+            csvContent += `${tx.id},${tx.type},${tx.date},${tx.amount || 0},${tx.amount_extracted || 0},${tx.amount_received || 0},${tx.from_account_id || ''},${tx.to_account_id || ''},${tx.category_id || ''},${tx.account_id || ''},"${notes}","${fAccName}",${tx.is_cross_profile?'true':'false'},${tx.cross_link_id||''},${tx.target_profile_id||''}\n`;
+        });
+        csvContent += "\n";
     });
 
-    // Create a Blob and trigger download
     const blob = new Blob(["\uFEFF"+csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement("a");
     link.href = URL.createObjectURL(blob);
-    link.setAttribute("download", `Finanzas_BackupFullDB_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `Finanzas_BackupFullProfiles_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1015,7 +1316,7 @@ window.importFromCSV = function(event) {
     const file = event.target.files[0];
     if(!file) return;
     
-    if(!confirm("⚠️ ADVERTENCIA CRÍTICA: Importar esta copia de seguridad sobrescribirá y reemplazará por completo todas tus cuentas, saldos, categorías, metas y transacciones actuales en este dispositivo, regresando al exacto punto de restauración del archivo. ¿Confirmas esta acción destructiva?")) {
+    if(!confirm("⚠️ ADVERTENCIA CRÍTICA: Importar esta copia sobrescribirá TODOS tus perfiles y datos financieros. ¿Confirmas esta acción destructiva?")) {
         event.target.value = '';
         return;
     }
@@ -1025,137 +1326,104 @@ window.importFromCSV = function(event) {
         const text = e.target.result;
         
         if(!text.includes('### BLOQUE_CUENTAS ###')) {
-            alert("Carga cancelada: El archivo no cumple con el formato estructurado del nuevo Sistema de Backup. Si es un historial transaccional antiguo, ya no es compatible para restauración de estado total.");
+            alert("Carga cancelada: El archivo no cumple con el formato estructurado del nuevo Sistema de Backup.");
             event.target.value = '';
             return;
         }
 
         const lines = text.split('\n').map(l => l.trim());
         let mode = '';
-        let newDB = {
-            settings: { baseCurrency: 'USD', exchangeRates: {} },
-            accounts: [],
-            categories: [],
-            goals: [],
-            transactions: []
-        };
+        let pArr = [];
+        let currentProfileObj = null;
         
         const parseCSVLine = (str) => {
-            const arr = [];
-            let inQuote = false;
-            let val = "";
+            const arr = []; let inQuote = false; let val = "";
             for (let i = 0; i < str.length; i++) {
                 const c = str[i];
                 if(c === '"') {
-                    if(inQuote && str[i+1] === '"') {
-                        val += '"'; // Comilla escapada ("" → ")
-                        i++; // Saltar la siguiente comilla
-                    } else {
-                        inQuote = !inQuote;
-                    }
-                } else if(c === ',' && !inQuote) {
-                    arr.push(val);
-                    val = "";
-                } else {
-                    val += c;
-                }
+                    if(inQuote && str[i+1] === '"') { val += '"'; i++; }
+                    else { inQuote = !inQuote; }
+                } else if(c === ',' && !inQuote) { arr.push(val); val = ""; }
+                else { val += c; }
             }
-            arr.push(val);
-            return arr;
+            arr.push(val); return arr;
         };
 
         for(let i = 0; i < lines.length; i++) {
             let line = lines[i];
             if(!line) continue;
             
-            if(line.startsWith('### ')) {
-                mode = line;
-                i++; // skip header line right below the tag
+            if(line.startsWith('@@@ PROFILE_START')) {
+                const parts = line.split('|').map(s=>s.trim());
+                currentProfileObj = {
+                    id: parts[1],
+                    name: parts[2].replace('@@@', '').trim(),
+                    db: { settings: { baseCurrency: 'USD', exchangeRates: {} }, accounts: [], categories: [], goals: [], transactions: [] }
+                };
+                pArr.push(currentProfileObj);
                 continue;
+            }
+            
+            if(!currentProfileObj) {
+                currentProfileObj = {
+                    id: 'profile_1', name: 'Principal (Importado)',
+                    db: { settings: { baseCurrency: 'USD', exchangeRates: {} }, accounts: [], categories: [], goals: [], transactions: [] }
+                };
+                pArr.push(currentProfileObj);
+            }
+
+            if(line.startsWith('### ')) {
+                mode = line; i++; continue;
             }
 
             const cols = parseCSVLine(line);
+            const _db = currentProfileObj.db;
 
             if(mode === '### AJUSTES_SISTEMA ###') {
                 if(cols.length >= 2) {
-                    newDB.settings.baseCurrency = cols[0];
-                    try { newDB.settings.exchangeRates = JSON.parse(cols[1]); } catch(err){}
+                    _db.settings.baseCurrency = cols[0];
+                    try { _db.settings.exchangeRates = JSON.parse(cols[1]); } catch(err){}
                 }
             }
             else if(mode === '### BLOQUE_CUENTAS ###') {
                 if(cols.length >= 6) {
                     const accId = isNaN(Number(cols[0])) ? cols[0] : Number(cols[0]);
-                    newDB.accounts.push({
-                        id: accId,
-                        name: cols[1],
-                        currency: cols[2],
-                        balance: parseFloat(cols[3]) || 0,
-                        type: cols[4],
-                        color: cols[5]
-                    });
+                    _db.accounts.push({ id: accId, name: cols[1], currency: cols[2], balance: parseFloat(cols[3]) || 0, type: cols[4], color: cols[5] });
                 }
             }
             else if(mode === '### BLOQUE_CATEGORIAS ###') {
                 if(cols.length >= 6) {
                     const catId = isNaN(Number(cols[0])) ? cols[0] : Number(cols[0]);
-                    newDB.categories.push({
-                        id: catId,
-                        name: cols[1],
-                        type: cols[2],
-                        budget: parseFloat(cols[3]) || 0,
-                        visual_color: cols[4],
-                        icon: cols[5],
-                        subtype: cols[6] || 'variable' // Soporte para nuevo campo subtype
-                    });
+                    _db.categories.push({ id: catId, name: cols[1], type: cols[2], budget: parseFloat(cols[3]) || 0, visual_color: cols[4], icon: cols[5], subtype: cols[6] || 'variable' });
                 }
             }
             else if(mode === '### BLOQUE_METAS ###') {
                 if(cols.length >= 6) {
                     const goalId = isNaN(Number(cols[0])) ? cols[0] : Number(cols[0]);
-                    newDB.goals.push({
-                        id: goalId,
-                        name: cols[1],
-                        target: parseFloat(cols[2]) || 0,
-                        current: parseFloat(cols[3]) || 0,
-                        icon: cols[4],
-                        account_id: cols[5] ? (isNaN(Number(cols[5])) ? cols[5] : Number(cols[5])) : null,
-                        is_emergency: cols[6] === 'true' // Soporte para nuevo campo is_emergency
-                    });
+                    _db.goals.push({ id: goalId, name: cols[1], target: parseFloat(cols[2]) || 0, current: parseFloat(cols[3]) || 0, icon: cols[4], account_id: cols[5] ? (isNaN(Number(cols[5])) ? cols[5] : Number(cols[5])) : null, is_emergency: cols[6] === 'true' });
                 }
             }
             else if(mode === '### BLOQUE_TRANSACCIONES ###') {
                 if(cols.length >= 11) { 
                     const parseId = (v) => v ? (isNaN(Number(v)) ? v : Number(v)) : null;
-                    newDB.transactions.push({
-                        id: cols[0],
-                        type: cols[1],
-                        date: cols[2],
-                        amount: parseFloat(cols[3]) || 0,
-                        amount_extracted: parseFloat(cols[4]) || 0,
-                        amount_received: parseFloat(cols[5]) || 0,
-                        from_account_id: parseId(cols[6]),
-                        to_account_id: parseId(cols[7]),
-                        category_id: parseId(cols[8]),
-                        account_id: parseId(cols[9]),
-                        notes: cols[10]
+                    _db.transactions.push({
+                        id: cols[0], type: cols[1], date: cols[2], amount: parseFloat(cols[3]) || 0,
+                        amount_extracted: parseFloat(cols[4]) || 0, amount_received: parseFloat(cols[5]) || 0,
+                        from_account_id: parseId(cols[6]), to_account_id: parseId(cols[7]),
+                        category_id: parseId(cols[8]), account_id: parseId(cols[9]), notes: cols[10],
+                        foreign_account_name: cols[11] || '', is_cross_profile: cols[12] === 'true',
+                        cross_link_id: cols[13] || '', target_profile_id: cols[14] || ''
                     });
                 }
             }
         }
         
-        if(newDB.accounts.length > 0) {
-            db.accounts = newDB.accounts;
-            db.categories = newDB.categories;
-            db.goals = newDB.goals;
-            db.transactions = newDB.transactions.sort((a,b) => new Date(b.date) - new Date(a.date));
-            if(newDB.settings && newDB.settings.baseCurrency) db.settings = newDB.settings;
-            
+        if(pArr.length > 0) {
+            pArr.forEach(p => { p.db.transactions.sort((a,b) => new Date(b.date) - new Date(a.date)); });
+            profilesState.profiles = pArr;
+            profilesState.activeProfileId = pArr[0].id;
             saveDB();
-            renderHome();
-            if(!document.getElementById('view-settings').classList.contains('hidden')) renderSettings();
-            if(!document.getElementById('view-analytics').classList.contains('hidden')) renderAnalytics();
-            
-            alert(`Amnesia selectiva controlada completada. La estructura financiera ha regresado fidedignamente al punto de restauración emitido en el CSV.`);
+            location.reload();
         } else {
             alert(`Error: Formato CSV incompatible o corrupto. Imposible efectuar la restauración.`);
         }

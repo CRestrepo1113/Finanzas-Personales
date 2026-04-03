@@ -26,7 +26,7 @@ body {
 .app-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 20px 10px; margin-top: 10px; }
 .user-info { display: flex; align-items: center; gap: 15px; }
 .avatar { font-size: 2.5rem; color: var(--text-primary); opacity: 0.9; }
-.avatar-img { width: 55px; height: 55px; border-radius: 5px 12px 6px 4px; transform: rotate(-2deg); object-fit: cover; border: 2px solid var(--text-primary); box-shadow: 2px 2px 0px var(--text-primary); }
+.avatar-img { width: 55px; height: 55px; border-radius: 5px 12px 6px 4px; transform: rotate(-2deg); object-fit: cover; }
 .greeting { font-family: var(--font-heading); font-size: 1.4rem; font-weight: 700; line-height: 1; margin-bottom: 2px;}
 .username { font-size: 0.9rem; color: var(--text-secondary); }
 .btn-icon { background: none; border: none; font-size: 1.5rem; color: var(--text-primary); cursor: pointer; }
@@ -175,6 +175,9 @@ body {
 .icon-selector { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; height: 115px; overflow-y: auto; padding: 5px; background: var(--bg-card); border: 2px solid var(--text-primary); border-radius: 4px 6px 2px 4px; }
 .icon-selector i { font-size: 1.35rem; padding: 10px; border: 2px dashed var(--text-secondary); border-radius: 8px 3px 6px 4px; cursor: pointer; color: var(--text-secondary); transition: all 0.2s; width: calc(25% - 8px); text-align: center; }
 .icon-selector i.selected { border-color: var(--text-primary); border-style: solid; background-color: var(--text-primary); color: var(--bg-primary); transform: scale(1.1); }
+.color-selector { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 5px; padding: 8px; background: var(--bg-card); border: 2px solid var(--text-primary); border-radius: 4px 6px 2px 4px; }
+.color-swatch { width: 35px; height: 35px; border-radius: 50%; border: 2px dashed var(--text-secondary); cursor: pointer; transition: all 0.2s; }
+.color-swatch.selected { border: 3px solid var(--text-primary); transform: scale(1.15); box-shadow: 2px 2px 0px var(--text-primary); }
 
 /* ZBB Styles */
 .zbb-huge-input { width: 100%; background: transparent; border: none; font-family: var(--font-heading); font-size: 3.5rem; font-weight: 700; color: var(--text-primary); outline: none; text-align: left; padding: 0; margin-top: 5px; }

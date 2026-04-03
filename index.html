@@ -26,10 +26,10 @@
     <div id="app">
         <!-- HEADER TOP -->
         <header class="app-header">
-            <div class="user-info">
+            <div class="user-info" onclick="openProfileManager()" style="cursor: pointer; padding: 5px; border-radius: 8px; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'">
                 <img src="icon.png" alt="App Icon" class="avatar-img">
                 <div>
-                    <p class="greeting">Hola, Cristian</p>
+                    <p class="greeting" id="profile-greeting">Hola, Cristian <i class="fas fa-caret-down" style="font-size: 0.8rem; margin-left: 5px; opacity: 0.7;"></i></p>
                 </div>
             </div>
             <div class="header-actions">
@@ -108,15 +108,19 @@
 
             <!-- ====== VIEW: ANALYTICS ====== -->
             <section id="view-analytics" class="view hidden">
-                <div class="section-header">
+                <div class="section-header" style="align-items: flex-start;">
                     <h3>Estadísticas</h3>
-                    <select class="filter-select" id="analytics-time-filter" onchange="renderAnalytics()">
-                        <option value="all">Todo el Historial</option>
-                        <option value="day">Día (Hoy)</option>
-                        <option value="week">Semana</option>
-                        <option value="month">Este Mes</option>
-                        <option value="year">Este Año</option>
-                    </select>
+                    <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 8px;">
+                        <select class="filter-select" id="analytics-time-filter" onchange="renderAnalytics()">
+                            <option value="all">Todo el Historial</option>
+                            <option value="day">Día (Hoy)</option>
+                            <option value="week">Semana</option>
+                            <option value="month">Este Mes</option>
+                            <option value="year">Este Año</option>
+                            <option value="custom">Fecha Específica</option>
+                        </select>
+                        <input type="date" id="analytics-custom-date" class="filter-select hidden" onchange="renderAnalytics()" style="width: auto;">
+                    </div>
                 </div>
 
                 <!-- Income / Outcome Cards -->
@@ -318,8 +322,30 @@
                         <input type="number" id="acc-balance" inputmode="decimal" step="any" placeholder="0.00" required>
                     </div>
                     <div class="input-group">
-                        <label for="acc-color">Color de Tarjeta (Base Dorada)</label>
-                        <input type="color" id="acc-color" value="#DDA629" style="width: 100%; height: 40px; border: 2px solid var(--text-primary); border-radius: 4px; padding: 2px; cursor: pointer; background: var(--bg-primary);">
+                        <label>Color de Tarjeta</label>
+                        <input type="hidden" id="acc-color" value="#DFB574">
+                        <div class="color-selector" id="acc-color-selector">
+                            <div class="color-swatch" style="background-color: #A5BCA6;" data-color="#A5BCA6"></div> <!-- Sage -->
+                            <div class="color-swatch" style="background-color: #D9A098;" data-color="#D9A098"></div> <!-- Terracotta -->
+                            <div class="color-swatch selected" style="background-color: #DFB574;" data-color="#DFB574"></div> <!-- Mustard -->
+                            <div class="color-swatch" style="background-color: #98B1C4;" data-color="#98B1C4"></div> <!-- Dusty Blue -->
+                            <div class="color-swatch" style="background-color: #B3A4B5;" data-color="#B3A4B5"></div> <!-- Lavender -->
+                            <div class="color-swatch" style="background-color: #9FD9C8;" data-color="#9FD9C8"></div> <!-- Mint -->
+                            <div class="color-swatch" style="background-color: #D1B894;" data-color="#D1B894"></div> <!-- Warm Sand -->
+                            <div class="color-swatch" style="background-color: #A36E6E;" data-color="#A36E6E"></div> <!-- Rosewood -->
+                            <div class="color-swatch" style="background-color: #6B8E9B;" data-color="#6B8E9B"></div> <!-- Slate -->
+                            <div class="color-swatch" style="background-color: #8C9970;" data-color="#8C9970"></div> <!-- Olive -->
+                            <div class="color-swatch" style="background-color: #C39A92;" data-color="#C39A92"></div> <!-- Dusty Rose -->
+                            <div class="color-swatch" style="background-color: #8FB9AA;" data-color="#8FB9AA"></div> <!-- Seafoam -->
+                            <div class="color-swatch" style="background-color: #D3C38A;" data-color="#D3C38A"></div> <!-- Pale Gold -->
+                            <div class="color-swatch" style="background-color: #A9C5DD;" data-color="#A9C5DD"></div> <!-- Powder Blue -->
+                            <div class="color-swatch" style="background-color: #D0BDB7;" data-color="#D0BDB7"></div> <!-- Mauve -->
+                            <div class="color-swatch" style="background-color: #82A6A2;" data-color="#82A6A2"></div> <!-- Teal Gray -->
+                            <div class="color-swatch" style="background-color: #E3D2B5;" data-color="#E3D2B5"></div> <!-- Cream Beige -->
+                            <div class="color-swatch" style="background-color: #C7A9A4;" data-color="#C7A9A4"></div> <!-- Soft Pink -->
+                            <div class="color-swatch" style="background-color: #8E9CA8;" data-color="#8E9CA8"></div> <!-- Steel Blue -->
+                            <div class="color-swatch" style="background-color: #AABB99;" data-color="#AABB99"></div> <!-- Matcha -->
+                        </div>
                     </div>
                     <button type="submit" class="btn btn-save" id="acc-save-btn">Registrar Cuenta</button>
                     <button type="button" class="btn btn-secondary hidden mt-10" id="acc-delete-btn" style="border-color: var(--action-expense); color: var(--action-expense);" onclick="deleteCurrentAccount()">Eliminar Cuenta</button>
@@ -358,16 +384,38 @@
                         <label for="cat-budget">Límite / Presupuesto Mensual (0 = Sin límite)</label>
                         <input type="number" id="cat-budget" placeholder="0" inputmode="decimal" step="any">
                     </div>
-                    <div class="input-group" style="display: flex; align-items: center; gap: 15px;">
-                        <div style="flex:1">
-                            <label for="cat-color">Color</label>
-                            <input type="color" id="cat-color" value="#B23A1E" style="height: 50px; padding: 5px;">
+                    <div class="input-group" style="display: flex; flex-direction:column; gap: 15px;">
+                        <div>
+                            <label>Color</label>
+                            <input type="hidden" id="cat-color" value="#6B8E9B">
+                            <div class="color-selector" id="cat-color-selector">
+                                <div class="color-swatch" style="background-color: #A5BCA6;" data-color="#A5BCA6"></div> <!-- Sage -->
+                                <div class="color-swatch" style="background-color: #D9A098;" data-color="#D9A098"></div> <!-- Terracotta -->
+                                <div class="color-swatch" style="background-color: #DFB574;" data-color="#DFB574"></div> <!-- Mustard -->
+                                <div class="color-swatch" style="background-color: #98B1C4;" data-color="#98B1C4"></div> <!-- Dusty Blue -->
+                                <div class="color-swatch" style="background-color: #B3A4B5;" data-color="#B3A4B5"></div> <!-- Lavender -->
+                                <div class="color-swatch" style="background-color: #9FD9C8;" data-color="#9FD9C8"></div> <!-- Mint -->
+                                <div class="color-swatch" style="background-color: #D1B894;" data-color="#D1B894"></div> <!-- Warm Sand -->
+                                <div class="color-swatch" style="background-color: #A36E6E;" data-color="#A36E6E"></div> <!-- Rosewood -->
+                                <div class="color-swatch selected" style="background-color: #6B8E9B;" data-color="#6B8E9B"></div> <!-- Slate -->
+                                <div class="color-swatch" style="background-color: #8C9970;" data-color="#8C9970"></div> <!-- Olive -->
+                                <div class="color-swatch" style="background-color: #C39A92;" data-color="#C39A92"></div> <!-- Dusty Rose -->
+                                <div class="color-swatch" style="background-color: #8FB9AA;" data-color="#8FB9AA"></div> <!-- Seafoam -->
+                                <div class="color-swatch" style="background-color: #D3C38A;" data-color="#D3C38A"></div> <!-- Pale Gold -->
+                                <div class="color-swatch" style="background-color: #A9C5DD;" data-color="#A9C5DD"></div> <!-- Powder Blue -->
+                                <div class="color-swatch" style="background-color: #D0BDB7;" data-color="#D0BDB7"></div> <!-- Mauve -->
+                                <div class="color-swatch" style="background-color: #82A6A2;" data-color="#82A6A2"></div> <!-- Teal Gray -->
+                                <div class="color-swatch" style="background-color: #E3D2B5;" data-color="#E3D2B5"></div> <!-- Cream Beige -->
+                                <div class="color-swatch" style="background-color: #C7A9A4;" data-color="#C7A9A4"></div> <!-- Soft Pink -->
+                                <div class="color-swatch" style="background-color: #8E9CA8;" data-color="#8E9CA8"></div> <!-- Steel Blue -->
+                                <div class="color-swatch" style="background-color: #AABB99;" data-color="#AABB99"></div> <!-- Matcha -->
+                            </div>
                         </div>
-                        <div style="flex:2">
+                        <div>
                             <label>Ícono</label>
                             <input type="hidden" id="cat-icon" value="fa-tag">
                             <div class="icon-selector" id="cat-icon-selector">
-                                <i class="fas fa-tag selected" data-icon="fa-tag"></i><i class="fas fa-shopping-basket" data-icon="fa-shopping-basket"></i><i class="fas fa-briefcase" data-icon="fa-briefcase"></i><i class="fas fa-utensils" data-icon="fa-utensils"></i><i class="fas fa-car" data-icon="fa-car"></i><i class="fas fa-bolt" data-icon="fa-bolt"></i><i class="fas fa-home" data-icon="fa-home"></i><i class="fas fa-plane" data-icon="fa-plane"></i><i class="fas fa-heartbeat" data-icon="fa-heartbeat"></i><i class="fas fa-gamepad" data-icon="fa-gamepad"></i><i class="fas fa-film" data-icon="fa-film"></i><i class="fas fa-book" data-icon="fa-book"></i><i class="fas fa-tshirt" data-icon="fa-tshirt"></i><i class="fas fa-paw" data-icon="fa-paw"></i><i class="fas fa-coffee" data-icon="fa-coffee"></i><i class="fas fa-laptop" data-icon="fa-laptop"></i><i class="fas fa-gift" data-icon="fa-gift"></i><i class="fas fa-music" data-icon="fa-music"></i>
+                                <i class="fas fa-tag selected" data-icon="fa-tag"></i><i class="fas fa-shopping-basket" data-icon="fa-shopping-basket"></i><i class="fas fa-briefcase" data-icon="fa-briefcase"></i><i class="fas fa-utensils" data-icon="fa-utensils"></i><i class="fas fa-car" data-icon="fa-car"></i><i class="fas fa-bolt" data-icon="fa-bolt"></i><i class="fas fa-home" data-icon="fa-home"></i><i class="fas fa-plane" data-icon="fa-plane"></i><i class="fas fa-heartbeat" data-icon="fa-heartbeat"></i><i class="fas fa-gamepad" data-icon="fa-gamepad"></i><i class="fas fa-film" data-icon="fa-film"></i><i class="fas fa-book" data-icon="fa-book"></i><i class="fas fa-tshirt" data-icon="fa-tshirt"></i><i class="fas fa-paw" data-icon="fa-paw"></i><i class="fas fa-coffee" data-icon="fa-coffee"></i><i class="fas fa-laptop" data-icon="fa-laptop"></i><i class="fas fa-gift" data-icon="fa-gift"></i><i class="fas fa-music" data-icon="fa-music"></i><i class="fas fa-piggy-bank" data-icon="fa-piggy-bank"></i><i class="fas fa-wallet" data-icon="fa-wallet"></i><i class="fas fa-money-bill-wave" data-icon="fa-money-bill-wave"></i><i class="fas fa-credit-card" data-icon="fa-credit-card"></i><i class="fas fa-dumbbell" data-icon="fa-dumbbell"></i><i class="fas fa-baby" data-icon="fa-baby"></i><i class="fas fa-graduation-cap" data-icon="fa-graduation-cap"></i><i class="fas fa-bus" data-icon="fa-bus"></i><i class="fas fa-bicycle" data-icon="fa-bicycle"></i><i class="fas fa-tools" data-icon="fa-tools"></i><i class="fas fa-wifi" data-icon="fa-wifi"></i><i class="fas fa-user" data-icon="fa-user"></i><i class="fas fa-building" data-icon="fa-building"></i><i class="fas fa-umbrella" data-icon="fa-umbrella"></i><i class="fas fa-camera" data-icon="fa-camera"></i><i class="fas fa-envelope" data-icon="fa-envelope"></i><i class="fas fa-clock" data-icon="fa-clock"></i><i class="fas fa-calendar-alt" data-icon="fa-calendar-alt"></i><i class="fas fa-compass" data-icon="fa-compass"></i><i class="fas fa-star" data-icon="fa-star"></i><i class="fas fa-lightbulb" data-icon="fa-lightbulb"></i><i class="fas fa-medal" data-icon="fa-medal"></i><i class="fas fa-trophy" data-icon="fa-trophy"></i><i class="fas fa-gem" data-icon="fa-gem"></i><i class="fas fa-crown" data-icon="fa-crown"></i><i class="fas fa-key" data-icon="fa-key"></i><i class="fas fa-lock" data-icon="fa-lock"></i><i class="fas fa-unlock" data-icon="fa-unlock"></i><i class="fas fa-leaf" data-icon="fa-leaf"></i><i class="fas fa-fire" data-icon="fa-fire"></i><i class="fas fa-water" data-icon="fa-water"></i><i class="fas fa-snowflake" data-icon="fa-snowflake"></i><i class="fas fa-shopping-cart" data-icon="fa-shopping-cart"></i><i class="fas fa-store-alt" data-icon="fa-store-alt"></i><i class="fas fa-motorcycle" data-icon="fa-motorcycle"></i><i class="fas fa-train" data-icon="fa-train"></i><i class="fas fa-ship" data-icon="fa-ship"></i><i class="fas fa-cocktail" data-icon="fa-cocktail"></i><i class="fas fa-apple-alt" data-icon="fa-apple-alt"></i>
                             </div>
                         </div>
                     </div>
@@ -447,7 +495,7 @@
                         <label>Ícono representativo</label>
                         <input type="hidden" id="goal-icon" value="fa-bullseye">
                         <div class="icon-selector" id="goal-icon-selector">
-                            <i class="fas fa-bullseye selected" data-icon="fa-bullseye"></i><i class="fas fa-plane" data-icon="fa-plane"></i><i class="fas fa-car" data-icon="fa-car"></i><i class="fas fa-home" data-icon="fa-home"></i><i class="fas fa-laptop" data-icon="fa-laptop"></i><i class="fas fa-gamepad" data-icon="fa-gamepad"></i><i class="fas fa-graduation-cap" data-icon="fa-graduation-cap"></i><i class="fas fa-ring" data-icon="fa-ring"></i><i class="fas fa-baby" data-icon="fa-baby"></i><i class="fas fa-piggy-bank" data-icon="fa-piggy-bank"></i><i class="fas fa-shield-alt" data-icon="fa-shield-alt" title="Fondo Emergencia"></i>
+                                <i class="fas fa-bullseye selected" data-icon="fa-bullseye"></i><i class="fas fa-plane" data-icon="fa-plane"></i><i class="fas fa-car" data-icon="fa-car"></i><i class="fas fa-home" data-icon="fa-home"></i><i class="fas fa-laptop" data-icon="fa-laptop"></i><i class="fas fa-gamepad" data-icon="fa-gamepad"></i><i class="fas fa-graduation-cap" data-icon="fa-graduation-cap"></i><i class="fas fa-ring" data-icon="fa-ring"></i><i class="fas fa-baby" data-icon="fa-baby"></i><i class="fas fa-piggy-bank" data-icon="fa-piggy-bank"></i><i class="fas fa-shield-alt" data-icon="fa-shield-alt" title="Fondo Emergencia"></i><i class="fas fa-briefcase" data-icon="fa-briefcase"></i><i class="fas fa-film" data-icon="fa-film"></i><i class="fas fa-tshirt" data-icon="fa-tshirt"></i><i class="fas fa-paw" data-icon="fa-paw"></i><i class="fas fa-dumbbell" data-icon="fa-dumbbell"></i><i class="fas fa-bus" data-icon="fa-bus"></i><i class="fas fa-bicycle" data-icon="fa-bicycle"></i><i class="fas fa-tools" data-icon="fa-tools"></i><i class="fas fa-building" data-icon="fa-building"></i><i class="fas fa-tag" data-icon="fa-tag"></i><i class="fas fa-shopping-basket" data-icon="fa-shopping-basket"></i><i class="fas fa-heartbeat" data-icon="fa-heartbeat"></i><i class="fas fa-camera" data-icon="fa-camera"></i><i class="fas fa-compass" data-icon="fa-compass"></i><i class="fas fa-star" data-icon="fa-star"></i><i class="fas fa-trophy" data-icon="fa-trophy"></i><i class="fas fa-gem" data-icon="fa-gem"></i><i class="fas fa-leaf" data-icon="fa-leaf"></i><i class="fas fa-store-alt" data-icon="fa-store-alt"></i><i class="fas fa-motorcycle" data-icon="fa-motorcycle"></i><i class="fas fa-train" data-icon="fa-train"></i>
                         </div>
                     </div>
                     <button type="submit" class="btn btn-save" id="goal-save-btn">Guardar Meta</button>
@@ -470,6 +518,75 @@
                         <input type="number" id="fund-amount" inputmode="decimal" step="any" placeholder="0.00" required>
                     </div>
                     <button type="submit" class="btn btn-save">Surtir</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Profile Manager Modal -->
+        <div id="profile-manager-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 style="font-family: var(--font-heading);">Gestor de Perfiles</h2>
+                    <button class="btn-icon" type="button" onclick="closeProfileManager()"><i class="fas fa-times"></i></button>
+                </div>
+                <p style="font-size: 0.9rem; color: var(--text-secondary); margin-bottom: 15px;">Selecciona un perfil para administrar sus cuentas, categorías e historial de manera independiente.</p>
+                <div id="profiles-list" class="transactions-list" style="margin-bottom: 20px; max-height: 400px; overflow-y: auto;">
+                    <!-- JS injected -->
+                </div>
+                <button class="btn btn-secondary" onclick="openProfileEditModal()" style="width: 100%; border: 2px dashed var(--text-secondary);"><i class="fas fa-plus"></i> Crear Nuevo Espacio</button>
+            </div>
+        </div>
+
+        <!-- Profile Edit/Create Modal -->
+        <div id="profile-edit-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h2 id="modal-title-profile">Nuevo Perfil</h2>
+                    <button class="btn-icon" type="button" onclick="closeProfileEditModal()"><i class="fas fa-times"></i></button>
+                </div>
+                <form id="profile-edit-form">
+                    <input type="hidden" id="profile-edit-id">
+                    <div class="input-group">
+                        <label for="profile-name">Nombre del Espacio</label>
+                        <input type="text" id="profile-name" placeholder="Ej. Personal, Negocio, Viaje" required>
+                    </div>
+                    <div class="input-group" style="display: flex; flex-direction:column; gap: 15px;">
+                        <div>
+                            <label>Color Temático</label>
+                            <input type="hidden" id="profile-color" value="#8C9970">
+                            <div class="color-selector" id="profile-color-selector">
+                                <div class="color-swatch" style="background-color: #A5BCA6;" data-color="#A5BCA6"></div> <!-- Sage -->
+                                <div class="color-swatch" style="background-color: #D9A098;" data-color="#D9A098"></div> <!-- Terracotta -->
+                                <div class="color-swatch" style="background-color: #DFB574;" data-color="#DFB574"></div> <!-- Mustard -->
+                                <div class="color-swatch" style="background-color: #98B1C4;" data-color="#98B1C4"></div> <!-- Dusty Blue -->
+                                <div class="color-swatch" style="background-color: #B3A4B5;" data-color="#B3A4B5"></div> <!-- Lavender -->
+                                <div class="color-swatch" style="background-color: #9FD9C8;" data-color="#9FD9C8"></div> <!-- Mint -->
+                                <div class="color-swatch" style="background-color: #D1B894;" data-color="#D1B894"></div> <!-- Warm Sand -->
+                                <div class="color-swatch" style="background-color: #A36E6E;" data-color="#A36E6E"></div> <!-- Rosewood -->
+                                <div class="color-swatch" style="background-color: #6B8E9B;" data-color="#6B8E9B"></div> <!-- Slate -->
+                                <div class="color-swatch selected" style="background-color: #8C9970;" data-color="#8C9970"></div> <!-- Olive -->
+                                <div class="color-swatch" style="background-color: #C39A92;" data-color="#C39A92"></div> <!-- Dusty Rose -->
+                                <div class="color-swatch" style="background-color: #8FB9AA;" data-color="#8FB9AA"></div> <!-- Seafoam -->
+                                <div class="color-swatch" style="background-color: #D3C38A;" data-color="#D3C38A"></div> <!-- Pale Gold -->
+                                <div class="color-swatch" style="background-color: #A9C5DD;" data-color="#A9C5DD"></div> <!-- Powder Blue -->
+                                <div class="color-swatch" style="background-color: #D0BDB7;" data-color="#D0BDB7"></div> <!-- Mauve -->
+                                <div class="color-swatch" style="background-color: #82A6A2;" data-color="#82A6A2"></div> <!-- Teal Gray -->
+                                <div class="color-swatch" style="background-color: #E3D2B5;" data-color="#E3D2B5"></div> <!-- Cream Beige -->
+                                <div class="color-swatch" style="background-color: #C7A9A4;" data-color="#C7A9A4"></div> <!-- Soft Pink -->
+                                <div class="color-swatch" style="background-color: #8E9CA8;" data-color="#8E9CA8"></div> <!-- Steel Blue -->
+                                <div class="color-swatch" style="background-color: #AABB99;" data-color="#AABB99"></div> <!-- Matcha -->
+                            </div>
+                        </div>
+                        <div>
+                            <label>Ícono</label>
+                            <input type="hidden" id="profile-icon" value="fa-user">
+                            <div class="icon-selector" id="profile-icon-selector">
+                                <i class="fas fa-user selected" data-icon="fa-user"></i><i class="fas fa-building" data-icon="fa-building"></i><i class="fas fa-briefcase" data-icon="fa-briefcase"></i><i class="fas fa-plane" data-icon="fa-plane"></i><i class="fas fa-home" data-icon="fa-home"></i><i class="fas fa-car" data-icon="fa-car"></i><i class="fas fa-graduation-cap" data-icon="fa-graduation-cap"></i><i class="fas fa-heartbeat" data-icon="fa-heartbeat"></i><i class="fas fa-piggy-bank" data-icon="fa-piggy-bank"></i><i class="fas fa-store" data-icon="fa-store"></i><i class="fas fa-globe" data-icon="fa-globe"></i><i class="fas fa-users" data-icon="fa-users"></i><i class="fas fa-chart-line" data-icon="fa-chart-line"></i><i class="fas fa-rocket" data-icon="fa-rocket"></i><i class="fas fa-camera" data-icon="fa-camera"></i><i class="fas fa-gem" data-icon="fa-gem"></i><i class="fas fa-coffee" data-icon="fa-coffee"></i><i class="fas fa-gamepad" data-icon="fa-gamepad"></i><i class="fas fa-shopping-cart" data-icon="fa-shopping-cart"></i><i class="fas fa-leaf" data-icon="fa-leaf"></i><i class="fas fa-water" data-icon="fa-water"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-save" id="profile-save-btn">Guardar Perfil</button>
+                    <!-- Eliminación requerirá el manager por la confirmación, pero se puede poner aquí si se desea -->
                 </form>
             </div>
         </div>
