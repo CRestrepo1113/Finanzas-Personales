@@ -756,7 +756,6 @@ window.openProfileManager = function() {
             </div>
             <div class="header-actions">
                 <button class="btn-icon" onclick="openProfileEditModal('${p.id}')" style="font-size: 1rem;"><i class="fas fa-pencil-alt"></i></button>
-                <button class="btn-icon" onclick="deleteProfile('${p.id}')" style="font-size: 1rem; color: var(--action-expense); margin-left: 5px;"><i class="fas fa-trash"></i></button>
             </div>
         </div>
     `).join('');
@@ -775,12 +774,17 @@ window.openProfileEditModal = function(id = null) {
         document.getElementById('profile-color').value = p.color;
         document.getElementById('profile-icon').value = p.icon;
         document.getElementById('modal-title-profile').textContent = "Editar Perfil";
+        
+        const delBtn = document.getElementById('profile-delete-btn');
+        delBtn.classList.remove('hidden');
+        delBtn.onclick = function() { deleteProfile(id); };
     } else {
         document.getElementById('profile-edit-id').value = "";
         document.getElementById('profile-name').value = "";
         document.getElementById('profile-color').value = "#8C9970";
         document.getElementById('profile-icon').value = "fa-user";
         document.getElementById('modal-title-profile').textContent = "Nuevo Perfil";
+        document.getElementById('profile-delete-btn').classList.add('hidden');
     }
 
     // Update color swatch

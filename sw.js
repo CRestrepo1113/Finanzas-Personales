@@ -1,11 +1,12 @@
 // Service Worker — Finanzas Personales PWA
-const CACHE_NAME = 'finanzas-v4.0';
+const CACHE_NAME = 'finanzas-v4.1';
 const ASSETS_TO_CACHE = [
     './',
     './index.html',
     './styles.css?v=4.0',
     './app.js?v=4.0',
-    './icon.png',
+    './icon.png?v=5',
+    './app-icon.png',
     './manifest.json',
     'https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=Inconsolata:wght@200..900&display=swap',
     'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css'
