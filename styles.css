@@ -26,7 +26,7 @@ body {
 .app-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 20px 10px; margin-top: 10px; }
 .user-info { display: flex; align-items: center; gap: 15px; }
 .avatar { font-size: 2.5rem; color: var(--text-primary); opacity: 0.9; }
-.avatar-img { width: 55px; height: 55px; border-radius: 5px 12px 6px 4px; transform: rotate(-2deg); object-fit: cover; }
+.avatar-img { width: 55px; height: 55px; transform: rotate(-2deg); object-fit: cover; mix-blend-mode: multiply; }
 .greeting { font-family: var(--font-heading); font-size: 1.4rem; font-weight: 700; line-height: 1; margin-bottom: 2px;}
 .username { font-size: 0.9rem; color: var(--text-secondary); }
 .btn-icon { background: none; border: none; font-size: 1.5rem; color: var(--text-primary); cursor: pointer; }
